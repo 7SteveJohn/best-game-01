@@ -5,7 +5,7 @@
 // the living things: the lighthouse beam, the flame, the towers, the
 // creatures, the shots, the sparks, and the placement guides.
 import { BOARD, PATH_CELLS, PALETTE } from './config.js';
-import { cellCenter } from './levels.js';
+import { cellCenter, isBuildable } from './levels.js';
 
 export class Renderer {
   constructor(canvas, rng) {
@@ -58,6 +58,56 @@ export class Renderer {
     ctx.arc(moonX + 9, moonY + 8, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
+    // Broad pools of moonlight on the empty ground, so the middle of
+    // the board is not one flat dark field. They are painted under the
+    // path, and stay faint enough that the night mood holds.
+    const pools = [
+      { x: 480, y: 104, r: 165 },
+      { x: 352, y: 288, r: 150 },
+      { x: 672, y: 256, r: 140 },
+      { x: 208, y: 480, r: 130 },
+      { x: 848, y: 480, r: 130 },
+    ];
+    for (const pool of pools) {
+      const wash = ctx.createRadialGradient(pool.x, pool.y, 8, pool.x, pool.y, pool.r);
+      wash.addColorStop(0, 'rgba(150, 180, 205, 0.11)');
+      wash.addColorStop(1, 'rgba(150, 180, 205, 0)');
+      ctx.fillStyle = wash;
+      ctx.fillRect(pool.x - pool.r, pool.y - pool.r, pool.r * 2, pool.r * 2);
+    }
+
+    // A soft dotted marker on every buildable plot, so the empty centre
+    // reads as ground waiting for towers rather than nothing at all.
+    ctx.fillStyle = 'rgba(130, 155, 150, 0.13)';
+    for (let row = 0; row < BOARD.rows; row++) {
+      for (let col = 0; col < BOARD.cols; col++) {
+        if (!isBuildable(col, row)) continue;
+        const c = cellCenter(col, row);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // A few rocks on the shore, for a landmark or two in the open ground.
+    for (let i = 0; i < 12; i++) {
+      const col = Math.floor(this.rng.range(0, BOARD.cols));
+      const row = Math.floor(this.rng.range(0, BOARD.rows));
+      if (!isBuildable(col, row)) continue;
+      const c = cellCenter(col, row);
+      const rx = c.x + this.rng.range(-16, 16);
+      const ry = c.y + this.rng.range(-14, 14);
+      const rr = 5 + this.rng.float() * 6;
+      ctx.fillStyle = '#232f47';
+      ctx.beginPath();
+      ctx.arc(rx, ry, rr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(150, 170, 200, 0.25)';
+      ctx.beginPath();
+      ctx.arc(rx - rr * 0.25, ry - rr * 0.3, rr * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Grass tufts scattered on the buildable ground.
     for (let i = 0; i < 240; i++) {
       const x = this.rng.range(0, BOARD.width);
@@ -80,6 +130,9 @@ export class Renderer {
       const y = row * BOARD.cell;
       ctx.fillStyle = PALETTE.path;
       ctx.fillRect(x + 2, y + 2, BOARD.cell - 4, BOARD.cell - 4);
+      ctx.strokeStyle = PALETTE.pathEdge;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 3, y + 3, BOARD.cell - 6, BOARD.cell - 6);
     }
     ctx.fillStyle = PALETTE.pathStone;
     for (const [col, row] of PATH_CELLS) {
@@ -140,14 +193,14 @@ export class Renderer {
     ctx.save();
     ctx.translate(lampX, lampY);
     ctx.rotate(beamAngle);
-    const beam = ctx.createLinearGradient(0, 0, 320, 0);
-    beam.addColorStop(0, 'rgba(255, 233, 168, 0.28)');
+    const beam = ctx.createLinearGradient(0, 0, 380, 0);
+    beam.addColorStop(0, 'rgba(255, 233, 168, 0.38)');
     beam.addColorStop(1, 'rgba(255, 233, 168, 0)');
     ctx.fillStyle = beam;
     ctx.beginPath();
     ctx.moveTo(0, -6);
-    ctx.lineTo(320, -52);
-    ctx.lineTo(320, 52);
+    ctx.lineTo(380, -64);
+    ctx.lineTo(380, 64);
     ctx.lineTo(0, 6);
     ctx.closePath();
     ctx.fill();
@@ -222,8 +275,8 @@ export class Renderer {
     const { x, y } = tower;
     const def = tower.def;
     const glow = ctx.createRadialGradient(x, y, 4, x, y, tower.range * 0.55);
-    glow.addColorStop(0, def.glow + '55');
-    glow.addColorStop(1, def.glow + '00');
+    glow.addColorStop(0, def.glowInner);
+    glow.addColorStop(1, def.glowOuter);
     ctx.fillStyle = glow;
     ctx.fillRect(x - tower.range * 0.55, y - tower.range * 0.55, tower.range * 1.1, tower.range * 1.1);
 

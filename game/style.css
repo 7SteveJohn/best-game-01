@@ -17,14 +17,14 @@ body {
   padding: 6px 12px; margin-bottom: 8px;
 }
 .brand { font-family: Georgia, serif; font-size: 20px; color: #ffb347; letter-spacing: 0.5px; }
-.stat { font-size: 14px; color: #e8ecf7; white-space: nowrap; }
+.stat { font-size: 16px; color: #e8ecf7; white-space: nowrap; }
 .stat span { font-weight: 700; }
 .stat.poor { color: #ff8a8a; }
 .ember-track {
   display: inline-block; width: 56px; height: 8px; border-radius: 4px;
   background: #1c2742; overflow: hidden; vertical-align: middle; margin-left: 4px;
 }
-#ember-bar { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff7a1a, #ffb347); }
+#ember-bar { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff8a24, #ffd76a); }
 .spacer { flex: 1; }
 button {
   background: #1c2a4a; color: #e8ecf7; border: 1px solid #3a4f7d;
@@ -96,6 +96,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 #selected .row { display: flex; gap: 8px; margin-top: 8px; }
 #selected .row button { flex: 1; }
 .hint { font-size: 12.5px; color: #9aa7c7; line-height: 1.5; margin: 4px 0; }
+.hint.strong { font-size: 13.5px; color: #ffd76a; font-weight: 600; }
+/* The Keeper's advice: what to fix, not only that something went wrong. */
+.advice { font-size: 13px; color: #ffb347; line-height: 1.5; margin: 6px 0 0; min-height: 19px; }
+.advice:empty { display: none; }
 .notes { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: #c6cfe6; }
 .notes li { margin-bottom: 5px; }
 

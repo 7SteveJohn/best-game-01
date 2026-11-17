@@ -9,7 +9,7 @@ A tower-defense game for the [make.fun best-game-01](https://make.fun/bounty/bes
 ## How to play
 
 - **Pick a tower** with keys `1`/`2`/`3` or by clicking its card, then **click a plot** to build it.
-- **Ember Brazier** (50 gold): cheap, fast, short reach. **Frost Lantern** (75 gold): chills what it hits, halving its speed. **Storm Spire** (120 gold): slow, heavy bolts that leap between foes.
+- **Ember Brazier** (50 gold): cheap, fast, short reach. **Frost Lantern** (75 gold): chills what it hits, halving its speed. **Storm Spire** (110 gold): slow, heavy bolts that leap between foes.
 - **Click a tower** on the board to upgrade it (up to level 3) or sell it back for 70%.
 - **Space** (or the button) starts the next wave. Clearing a wave pays a bonus.
 - **P** pause, **F** double speed, **M** mute, **R** restart on the end screen.

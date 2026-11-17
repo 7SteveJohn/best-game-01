@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberlight — The Last Lighthouse</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="brand">🔥 Emberlight</div>
+    <div class="stat" title="Gold to spend on towers">⬤ <span id="gold">160</span> gold</div>
+    <div class="stat" title="Waves cleared">🌊 Wave <span id="wave">0/12</span></div>
+    <div class="stat ember" title="Hits the ember can take">
+      <span class="flame">🔥</span> <span id="ember">12/12</span>
+      <span class="ember-track"><span id="ember-bar"></span></span>
+    </div>
+    <div class="stat" title="Creatures burned">💀 <span id="kills">0</span></div>
+    <div class="stat" title="Score">★ <span id="score">0</span></div>
+    <div class="spacer"></div>
+    <button id="btn-wave">Start Wave 1 (Space)</button>
+    <button id="btn-speed">Speed 1× (F)</button>
+    <button id="btn-pause">Pause (P)</button>
+    <button id="btn-sound">Sound on (M)</button>
+    <button id="btn-restart">Restart</button>
+  </header>
+
+  <main id="middle">
+    <div id="stage">
+      <canvas id="game" width="960" height="576"></canvas>
+
+      <div id="title-screen" class="overlay">
+        <h1>Emberlight</h1>
+        <p class="tagline">The Last Lighthouse</p>
+        <p class="story">
+          Night has swallowed the shore, and the dark is crawling toward the
+          last ember. You are the Keeper. Raise braziers, lanterns and storm
+          spires along the shore path, burn the creatures down before they
+          reach the lighthouse — and hold the light through all twelve waves.
+        </p>
+        <div class="how">
+          <span><b>1 / 2 / 3</b> pick a tower</span>
+          <span><b>Click</b> a plot to build it</span>
+          <span><b>Click</b> a tower to upgrade or sell</span>
+          <span><b>Space</b> start the next wave</span>
+          <span><b>P</b> pause · <b>F</b> speed · <b>M</b> sound</span>
+        </div>
+        <button id="btn-start" class="big">Light the First Flame</button>
+        <p class="foot">Twelve waves. One ember. No dawn until the last wisp burns.</p>
+      </div>
+
+      <div id="end-screen" class="overlay hidden">
+        <h1 id="end-title">Dawn Breaks</h1>
+        <p id="end-reason" class="story"></p>
+        <div id="end-stats" class="stats"></div>
+        <button id="btn-again" class="big">Play Again (R)</button>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <h2>Build</h2>
+      <div id="shop"></div>
+      <h2>Your tower</h2>
+      <div id="selected">
+        <p class="hint">Click a tower on the board to upgrade or sell it. Click a plot with a tower picked to build.</p>
+      </div>
+      <h2>Next wave</h2>
+      <p id="next-wave" class="hint strong">Next: Wave 1 — 12 Wisps</p>
+      <p id="advice" class="advice"></p>
+      <h2>Keeper's notes</h2>
+      <ul class="notes">
+        <li>Creatures walk the shore path to the lighthouse. A leak costs ember.</li>
+        <li>Frost Lanterns slow the march — put them where the path bends.</li>
+        <li>Storm Spires hit hard and their bolts leap. Save them for brutes.</li>
+        <li>Clearing a wave pays a bonus. Spend it before the next horn.</li>
+      </ul>
+    </aside>
+  </main>
+
+  <footer id="keys">
+    Mouse builds and aims · 1/2/3 towers · Space next wave · P pause · F speed · M sound · R restart on the end screen
+  </footer>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

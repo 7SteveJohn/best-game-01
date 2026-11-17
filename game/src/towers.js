@@ -33,9 +33,13 @@ export class Tower {
     return this.def.rate;
   }
 
+  // The first upgrade is deliberately cheaper than the later one, so a
+  // Keeper who has built wide can afford to make one tower stronger
+  // instead of only adding more level-one towers.
   get upgradeCost() {
     if (this.level >= ECONOMY.maxLevel) return null;
-    return Math.round(this.def.cost * ECONOMY.upgradeCostFactor * this.level);
+    const factor = this.level === 1 ? ECONOMY.upgradeCostFactorFirst : ECONOMY.upgradeCostFactor;
+    return Math.round(this.def.cost * factor * this.level);
   }
 
   get sellValue() {

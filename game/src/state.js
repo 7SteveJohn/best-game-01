@@ -7,6 +7,16 @@ import { ECONOMY, TOTAL_WAVES } from './config.js';
 import { Enemy } from './enemies.js';
 import { buildWaveQueue } from './levels.js';
 
+// What the Keeper is told after a leak: one line per creature, naming
+// the fix instead of only the loss. The panel shows the latest one.
+export const LEAK_ADVICE = {
+  wisp: 'A Wisp slipped through — the towers near the door need more reach, or a second flame beside them.',
+  shade: 'A Shade slipped through — slow, tough skin. Concentrate fire where the path bends.',
+  brute: 'A Brute broke through — brutes need concentrated damage. Upgrade a tower near the bend, or add a Storm Spire.',
+  wraith: 'A Wraith slipped past — wraiths heal as they walk. Focus them down before they leave the light.',
+  moth: 'The Dread Moth reached the ember — it takes everything you have. Spend it all before the last horn.',
+};
+
 export const PHASES = {
   TITLE: 'title',
   BUILD: 'build', // between waves: place towers, then start the next wave
@@ -40,6 +50,8 @@ export class GameState {
     this.paused = false;
     this.waveBanner = null; // { text, until } shown centre-screen
     this.endReason = '';
+    this.leaksByType = {}; // creature type -> how many reached the door
+    this.advice = ''; // latest leak advice, shown in the side panel
     this.events = []; // kill/leak/wave events, drained by the loop for effects
   }
 
@@ -140,15 +152,35 @@ export class GameState {
 
   onLeak(enemy) {
     this.leaked += 1;
+    this.leaksByType[enemy.type] = (this.leaksByType[enemy.type] || 0) + 1;
+    this.advice = LEAK_ADVICE[enemy.type] || '';
     this.ember -= enemy.leak;
     this.events.push({ kind: 'leak', x: enemy.x, y: enemy.y, leak: enemy.leak });
     this.sounds.leak();
     if (this.ember <= 0) {
       this.ember = 0;
       this.phase = PHASES.LOST;
-      this.endReason = 'The ember went out. The dark took the shore.';
+      this.endReason = this.lossReason();
       this.sounds.lose();
     }
+  }
+
+  // The loss screen says what actually broke, from the leaks counted,
+  // so a Keeper who lost knows what to change next time.
+  lossReason() {
+    const brutes = this.leaksByType.brute || 0;
+    const wraiths = this.leaksByType.wraith || 0;
+    const shades = this.leaksByType.shade || 0;
+    if (brutes > 0) {
+      return `The ember went out. ${brutes} brute${brutes > 1 ? 's' : ''} broke through — they need concentrated damage: upgrade towers near the final bend, or add a Storm Spire.`;
+    }
+    if (wraiths > 0) {
+      return `The ember went out. Wraiths slipped past and healed on the march — focus them with braziers before they leave the light.`;
+    }
+    if (shades > 0) {
+      return `The ember went out. Shades wore the line down — slow them with a Frost Lantern and stack fire on the bends.`;
+    }
+    return 'The ember went out. The dark took the shore — build wider, upgrade sooner, and mind the bend.';
   }
 
   onWaveCleared() {

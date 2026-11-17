@@ -32,7 +32,8 @@ export const ECONOMY = {
   sellRefund: 0.7,
   waveClearBonus: 20,
   waveClearPerWave: 4,
-  upgradeCostFactor: 0.6, // of the tower's base cost, per level
+  upgradeCostFactor: 0.6, // of the tower's base cost, per level, for later upgrades
+  upgradeCostFactorFirst: 0.5, // of the tower's base cost, for the first upgrade
   upgradeDamageFactor: 0.35, // +35% damage per level
   upgradeRangeFactor: 0.1, // +10% range per level
   maxLevel: 3,
@@ -52,6 +53,8 @@ export const TOWERS = {
     projectileSpeed: 400,
     color: '#ffb347',
     glow: '#ff7a1a',
+    glowInner: '#ff7a1a99',
+    glowOuter: '#ff7a1a22',
     blurb: 'Cheap and quick. A hungry little flame.',
     detail: 'Fast shots, short reach. Best in numbers.',
   },
@@ -68,6 +71,8 @@ export const TOWERS = {
     slowSeconds: 1.8,
     color: '#7fd4ff',
     glow: '#2f7fd0',
+    glowInner: '#2f9fe066',
+    glowOuter: '#2f9fe018',
     blurb: 'Cold light that holds the dark still.',
     detail: 'Chills what it hits, halving its speed.',
   },
@@ -75,7 +80,7 @@ export const TOWERS = {
     id: 'spire',
     name: 'Storm Spire',
     key: '3',
-    cost: 120,
+    cost: 110,
     damage: 40,
     rate: 0.55,
     range: 172,
@@ -84,6 +89,8 @@ export const TOWERS = {
     chainFalloff: 0.65, // damage kept per jump
     color: '#c9a7ff',
     glow: '#7b4dff',
+    glowInner: '#8b6cff66',
+    glowOuter: '#7b4dff18',
     blurb: 'A crystal that calls the storm down.',
     detail: 'Slow, heavy bolts that leap between foes.',
   },
@@ -164,8 +171,8 @@ export function enemyHpFor(type, wave) {
 // Twelve waves. Each entry lists how many of each creature march, in
 // spawn order groups; the builder in levels.js turns it into a queue.
 export const WAVES = [
-  { wisp: 8 },
-  { wisp: 12, shade: 3 },
+  { wisp: 12 },
+  { wisp: 14, shade: 4 },
   { wisp: 10, shade: 8 },
   { wisp: 14, shade: 8, wraith: 4 },
   { shade: 12, wraith: 6, brute: 2 },
@@ -181,21 +188,29 @@ export const WAVES = [
 export const TOTAL_WAVES = WAVES.length;
 
 // Spawn pacing: seconds between creatures in a wave, shrinking as the
-// waves deepen so later marches feel like a flood.
+// waves deepen so later marches feel like a flood. The first two waves
+// spawn faster than before, so the opening screen is visibly populated;
+// from wave 3 on the pacing is the first version's, which the balance
+// was tuned against.
 export function spawnGapFor(wave) {
+  if (wave === 1) return 0.65;
+  if (wave === 2) return 0.62;
   return Math.max(0.35, 0.9 - wave * 0.045);
 }
 
 // The night palette. Warm amber is the light; cold blue-teal is the dark.
+// The ground values were lifted from the first version so the board
+// keeps its structure when a screenshot is shrunk: the path and the
+// build ground still read as different places in the dark.
 export const PALETTE = {
   skyTop: '#070b1d',
   skyMid: '#0d1531',
-  ground: '#101b2e',
-  groundAlt: '#0e1828',
-  grassTuft: '#1d3a2f',
-  path: '#3a2f26',
-  pathEdge: '#57473a',
-  pathStone: '#6b5a49',
+  ground: '#17263a',
+  groundAlt: '#142338',
+  grassTuft: '#315344',
+  path: '#514235',
+  pathEdge: '#79634d',
+  pathStone: '#92785c',
   moon: '#f4ead0',
   star: '#dfe8ff',
   ember: '#ffb347',

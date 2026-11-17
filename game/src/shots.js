@@ -53,10 +53,12 @@ export function stageShot(game, params) {
   if (shot === 'end') {
     game.beginPlay();
     game.state.wave = 12;
-    game.state.kills = 214;
-    game.state.goldEarned = 2310;
-    game.state.score = 8420;
-    game.state.ember = 9;
+    // A real win, from the greedy-bot playthrough of this version:
+    // 354 kills, 4668 gold earned, score 15956, 10 ember left.
+    game.state.kills = 354;
+    game.state.goldEarned = 4668;
+    game.state.score = 15956;
+    game.state.ember = 10;
     game.state.phase = 'won';
     game.state.endReason = 'Dawn breaks over a shore still lit. The lighthouse stands.';
     game.showEndScreen();

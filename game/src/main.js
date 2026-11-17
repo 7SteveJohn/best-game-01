@@ -255,6 +255,40 @@ export class Emberlight {
     }
   }
 
+  // What the Keeper is told before the next wave: a concrete tip when
+  // the coming roster exposes a gap in the army, else the latest leak
+  // advice, else nothing. It is the game's way of saying why, not only
+  // that the last wave hurt.
+  waveTip(next) {
+    const state = this.state;
+    const has = (type) => state.towers.some((t) => t.type === type);
+    const upgraded = state.towers.filter((t) => t.level > 1).length;
+    if (next === 4 && !has('lantern')) {
+      return 'Wave 4 brings Wraiths that heal as they walk — a Frost Lantern near the bend holds them still.';
+    }
+    if (next === 6 && !has('spire') && upgraded === 0) {
+      return 'Wave 6 brings Brutes — upgrade a damage tower near a bend, or add a Storm Spire.';
+    }
+    if (next === 9 && !has('spire') && upgraded < 2) {
+      return 'Wave 9 is a wall of Brutes — your damage needs to be concentrated, not spread thin. Upgrade, or add a Spire.';
+    }
+    return null;
+  }
+
+  currentAdvice() {
+    const state = this.state;
+    if (state.phase === PHASES.WAVE) return state.advice || '';
+    if (state.phase === PHASES.BUILD) {
+      const tip = this.waveTip(state.nextWaveNumber);
+      if (tip) return tip;
+      if (state.wave >= 3 && state.towers.length > 4 && !state.towers.some((t) => t.level > 1)) {
+        return 'Your army is wide but unupgraded — one upgrade costs less than a new tower and helps every wave after.';
+      }
+      return state.advice || '';
+    }
+    return '';
+  }
+
   refreshShop() {
     for (const id of TOWER_ORDER) {
       const card = $(`shop-${id}`);
@@ -268,6 +302,8 @@ export class Emberlight {
         ? 'All waves faced.'
         : `Next: Wave ${this.state.nextWaveNumber} — ${describeWave(this.state.nextWaveNumber)}`;
     }
+    const advice = $('advice');
+    if (advice) advice.textContent = this.currentAdvice();
   }
 
   refreshSelected() {
