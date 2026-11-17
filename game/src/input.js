@@ -1,53 +1,83 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// Emberlight — mouse and keyboard.
+//
+// Clicking is the whole game: pick a tower from the shop (or press 1/2/3),
+// click a plot to build it, click a tower to see it and upgrade or sell
+// it. Space starts the next wave, P pauses, F doubles the speed, M
+// mutes, Esc puts the hammer down.
+import { BOARD } from './config.js';
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+export class Input {
+  constructor(canvas, handlers) {
+    this.canvas = canvas;
+    this.handlers = handlers;
+    this.hover = null; // { col, row } under the mouse, or null
+    this.onMouseMove = this.onMouseMove.bind(this);
+    this.onMouseLeave = this.onMouseLeave.bind(this);
+    this.onClick = this.onClick.bind(this);
+    this.onKeyDown = this.onKeyDown.bind(this);
+    canvas.addEventListener('mousemove', this.onMouseMove);
+    canvas.addEventListener('mouseleave', this.onMouseLeave);
+    canvas.addEventListener('click', this.onClick);
+    window.addEventListener('keydown', this.onKeyDown);
+  }
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+  // Canvas pixels -> grid cell, or null when the pointer is off the board.
+  cellFromEvent(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+    const col = Math.floor(x / BOARD.cell);
+    const row = Math.floor(y / BOARD.cell);
+    if (col < 0 || col >= BOARD.cols || row < 0 || row >= BOARD.rows) return null;
+    return { col, row };
+  }
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
+  onMouseMove(event) {
+    this.hover = this.cellFromEvent(event);
+    this.handlers.onHover(this.hover);
+  }
 
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
-  });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+  onMouseLeave() {
+    this.hover = null;
+    this.handlers.onHover(null);
+  }
 
-  return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
-    },
-  };
+  onClick(event) {
+    const cell = this.cellFromEvent(event);
+    if (!cell) return;
+    this.handlers.onCellClick(cell.col, cell.row);
+  }
+
+  onKeyDown(event) {
+    // Ignore keys typed into a button or input.
+    if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON')) {
+      if (event.key !== ' ') return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === '1' || key === '2' || key === '3') {
+      this.handlers.onPickType(['brazier', 'lantern', 'spire'][Number(key) - 1]);
+    } else if (key === ' ') {
+      event.preventDefault();
+      this.handlers.onStartWave();
+    } else if (key === 'p') {
+      this.handlers.onTogglePause();
+    } else if (key === 'f') {
+      this.handlers.onToggleSpeed();
+    } else if (key === 'm') {
+      this.handlers.onToggleMute();
+    } else if (key === 'escape') {
+      this.handlers.onCancel();
+    } else if (key === 'r') {
+      this.handlers.onRestartKey();
+    }
+  }
+
+  detach() {
+    this.canvas.removeEventListener('mousemove', this.onMouseMove);
+    this.canvas.removeEventListener('mouseleave', this.onMouseLeave);
+    this.canvas.removeEventListener('click', this.onClick);
+    window.removeEventListener('keydown', this.onKeyDown);
+  }
 }
