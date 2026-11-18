@@ -109,50 +109,27 @@ export class SoundBank {
     this.tone({ type: 'triangle', from: 660, to: 520, seconds: 0.06, volume: 0.12 });
   }
 
-  build() {
-    this.noise({ seconds: 0.12, volume: 0.25, frequency: 300 });
-    this.tone({ type: 'triangle', from: 180, to: 120, seconds: 0.14, volume: 0.2 });
+  // The beam catching a creature: a soft pluck, rising with the load.
+  catch() {
+    this.tone({ type: 'sine', from: 880, to: 1175, seconds: 0.09, volume: 0.1 });
   }
 
-  upgrade() {
-    this.tone({ type: 'sine', from: 523, seconds: 0.1, volume: 0.16 });
-    this.tone({ type: 'sine', from: 784, seconds: 0.14, volume: 0.16, delay: 0.07 });
+  // A delivery burning in a furnace: a deep whoosh under a warm chime.
+  deliver() {
+    this.noise({ seconds: 0.3, volume: 0.25, frequency: 300 });
+    this.tone({ type: 'sine', from: 523, seconds: 0.2, volume: 0.14 });
+    this.tone({ type: 'sine', from: 784, seconds: 0.28, volume: 0.14, delay: 0.08 });
   }
 
-  sell() {
-    this.tone({ type: 'sine', from: 784, to: 392, seconds: 0.12, volume: 0.14 });
+  // A creature breaking free of the beam: a short falling note.
+  escape() {
+    this.tone({ type: 'sine', from: 660, to: 330, seconds: 0.16, volume: 0.12 });
   }
 
-  shootBrazier() {
-    this.tone({ type: 'square', from: 880, to: 520, seconds: 0.07, volume: 0.05 });
-  }
-
-  shootLantern() {
-    this.tone({ type: 'sine', from: 1180, to: 900, seconds: 0.12, volume: 0.06 });
-  }
-
-  shootSpire() {
-    this.noise({ seconds: 0.09, volume: 0.12, frequency: 2400 });
-    this.tone({ type: 'sawtooth', from: 320, to: 90, seconds: 0.16, volume: 0.1 });
-  }
-
-  // The Tide Bell's ring: a low chime with a long tail.
-  bell() {
-    this.tone({ type: 'sine', from: 392, seconds: 0.5, volume: 0.14 });
-    this.tone({ type: 'sine', from: 587, seconds: 0.4, volume: 0.08, delay: 0.02 });
-  }
-
-  // Choosing a blessing: a warm rising pair.
-  blessing() {
-    this.tone({ type: 'sine', from: 659, seconds: 0.14, volume: 0.14 });
-    this.tone({ type: 'sine', from: 988, seconds: 0.22, volume: 0.14, delay: 0.1 });
-  }
-
-  // The Beacon Flare: a deep boom under a rising whoosh of fire.
-  flare() {
-    this.noise({ seconds: 0.35, volume: 0.3, frequency: 220 });
-    this.tone({ type: 'sawtooth', from: 90, to: 40, seconds: 0.4, volume: 0.2 });
-    this.tone({ type: 'sine', from: 440, to: 1760, seconds: 0.35, volume: 0.1, delay: 0.05 });
+  // A furnace finishing its cooldown: a low chime.
+  furnaceReady() {
+    this.tone({ type: 'sine', from: 392, seconds: 0.3, volume: 0.1 });
+    this.tone({ type: 'sine', from: 587, seconds: 0.25, volume: 0.07, delay: 0.05 });
   }
 
   kill() {

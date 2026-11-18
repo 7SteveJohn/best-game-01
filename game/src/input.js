@@ -1,53 +1,58 @@
-// Emberlight — mouse and keyboard.
+// Emberlight v5 — mouse and keyboard.
 //
-// Clicking is the whole game: pick a tower from the shop (or press 1/2/3/4),
-// click a plot to build it, click a tower to see it and upgrade or sell
-// it. 5 arms the Beacon Flare, Space starts the next wave, P pauses, F
-// doubles the speed, M mutes, Esc puts the hammer down.
+// The mouse is the whole game: move it and the beam follows, hold the
+// button down to gather the dark into the light, let go over a furnace
+// to burn what you caught — or let go anywhere else and watch it slip
+// free. Space starts the next watch, P pauses, F doubles the speed, M
+// mutes, R restarts on the end screen.
 import { BOARD } from './config.js';
 
 export class Input {
   constructor(canvas, handlers) {
     this.canvas = canvas;
     this.handlers = handlers;
-    this.hover = null; // { col, row } under the mouse, or null
+    this.hover = null; // { x, y } in canvas pixels under the mouse, or null
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseLeave = this.onMouseLeave.bind(this);
-    this.onClick = this.onClick.bind(this);
+    this.onMouseDown = this.onMouseDown.bind(this);
+    this.onMouseUp = this.onMouseUp.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
     canvas.addEventListener('mousemove', this.onMouseMove);
     canvas.addEventListener('mouseleave', this.onMouseLeave);
-    canvas.addEventListener('click', this.onClick);
+    canvas.addEventListener('mousedown', this.onMouseDown);
+    window.addEventListener('mouseup', this.onMouseUp);
     window.addEventListener('keydown', this.onKeyDown);
   }
 
-  // Canvas pixels -> grid cell, or null when the pointer is off the board.
-  cellFromEvent(event) {
+  // Canvas pixels for a mouse event, or null when the pointer is off
+  // the board.
+  pointFromEvent(event) {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
     const x = (event.clientX - rect.left) * scaleX;
     const y = (event.clientY - rect.top) * scaleY;
-    const col = Math.floor(x / BOARD.cell);
-    const row = Math.floor(y / BOARD.cell);
-    if (col < 0 || col >= BOARD.cols || row < 0 || row >= BOARD.rows) return null;
-    return { col, row };
+    if (x < 0 || x >= BOARD.width || y < 0 || y >= BOARD.height) return null;
+    return { x, y };
   }
 
   onMouseMove(event) {
-    this.hover = this.cellFromEvent(event);
-    this.handlers.onHover(this.hover);
+    this.hover = this.pointFromEvent(event);
+    this.handlers.onAim(this.hover);
   }
 
   onMouseLeave() {
     this.hover = null;
-    this.handlers.onHover(null);
   }
 
-  onClick(event) {
-    const cell = this.cellFromEvent(event);
-    if (!cell) return;
-    this.handlers.onCellClick(cell.col, cell.row);
+  onMouseDown(event) {
+    if (event.button !== 0) return;
+    this.handlers.onGatherStart();
+  }
+
+  onMouseUp(event) {
+    if (event.button !== 0) return;
+    this.handlers.onGatherEnd();
   }
 
   onKeyDown(event) {
@@ -56,25 +61,15 @@ export class Input {
       if (event.key !== ' ') return;
     }
     const key = event.key.toLowerCase();
-    if (key === '1' || key === '2' || key === '3' || key === '4') {
-      // Number keys pick a tower — or, while a blessing waits, the
-      // blessing in that place. The game decides which; input only
-      // reports the place.
-      this.handlers.onPickIndex(Number(key) - 1);
-    } else if (key === '5') {
-      // 5 arms the Beacon Flare: the next click on the board aims it.
-      this.handlers.onArmBeacon?.();
-    } else if (key === ' ') {
+    if (key === ' ') {
       event.preventDefault();
-      this.handlers.onStartWave();
+      this.handlers.onStartWatch();
     } else if (key === 'p') {
       this.handlers.onTogglePause();
     } else if (key === 'f') {
       this.handlers.onToggleSpeed();
     } else if (key === 'm') {
       this.handlers.onToggleMute();
-    } else if (key === 'escape') {
-      this.handlers.onCancel();
     } else if (key === 'r') {
       this.handlers.onRestartKey();
     }
@@ -83,7 +78,8 @@ export class Input {
   detach() {
     this.canvas.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mouseleave', this.onMouseLeave);
-    this.canvas.removeEventListener('click', this.onClick);
+    this.canvas.removeEventListener('mousedown', this.onMouseDown);
+    window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('keydown', this.onKeyDown);
   }
 }

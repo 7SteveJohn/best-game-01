@@ -1,11 +1,11 @@
-// Emberlight — everything the eye sees, drawn on one canvas.
+// Emberlight v5 — everything the eye sees, drawn on one canvas.
 //
-// The night shore is painted once onto an offscreen layer (sky, moon,
-// ground, path, grass). Each frame the renderer draws that layer, then
-// the living things: the lighthouse beam, the flame, the towers, the
-// creatures, the shots, the sparks, and the placement guides.
-import { BEACON, BLACKOUT_COLS, BOARD, PATH_CELLS, PALETTE } from './config.js';
-import { cellCenter, isBuildable } from './levels.js';
+// The night sea is painted once onto an offscreen layer (sky, moon,
+// dark water, the shore by the lighthouse, islets for the furnaces).
+// Each frame the renderer draws that layer, then the living things:
+// the Keeper's beam, the furnaces, the creatures in the dark and in
+// the light, the sparks, and the banner.
+import { BEAM, BOARD, FURNACES, LAMP, PALETTE } from './config.js';
 
 export class Renderer {
   constructor(canvas, rng) {
@@ -28,15 +28,16 @@ export class Renderer {
     this.paintBase();
   }
 
-  // The static shore: gradient sky, moon, dark ground, the winding path
-  // with edge stones, and tufts of grass. Painted once, reused forever.
+  // The static sea: gradient sky, moon, dark water with wave strokes,
+  // the sandy shore by the lighthouse, and a rocky islet under each
+  // furnace. Painted once, reused forever.
   paintBase() {
     const ctx = this.base.getContext('2d');
     const sky = ctx.createLinearGradient(0, 0, 0, BOARD.height);
     sky.addColorStop(0, PALETTE.skyTop);
     sky.addColorStop(0.45, PALETTE.skyMid);
-    sky.addColorStop(0.46, PALETTE.ground);
-    sky.addColorStop(1, PALETTE.groundAlt);
+    sky.addColorStop(0.46, '#0d1a2e');
+    sky.addColorStop(1, '#12233a');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, BOARD.width, BOARD.height);
 
@@ -58,9 +59,8 @@ export class Renderer {
     ctx.arc(moonX + 9, moonY + 8, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Broad pools of moonlight on the empty ground, so the middle of
-    // the board is not one flat dark field. They are painted under the
-    // path, and stay faint enough that the night mood holds.
+    // Broad pools of moonlight on the water, so the middle of the
+    // board is not one flat dark field.
     const pools = [
       { x: 480, y: 104, r: 165 },
       { x: 352, y: 288, r: 150 },
@@ -76,42 +76,46 @@ export class Renderer {
       ctx.fillRect(pool.x - pool.r, pool.y - pool.r, pool.r * 2, pool.r * 2);
     }
 
-    // A soft dotted marker on every buildable plot, so the empty centre
-    // reads as ground waiting for towers rather than nothing at all.
-    ctx.fillStyle = 'rgba(130, 155, 150, 0.13)';
-    for (let row = 0; row < BOARD.rows; row++) {
-      for (let col = 0; col < BOARD.cols; col++) {
-        if (!isBuildable(col, row)) continue;
-        const c = cellCenter(col, row);
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    // Wave strokes across the sea: thin arcs, faint, so the water
+    // reads as moving even when it is still.
+    ctx.strokeStyle = 'rgba(140, 180, 210, 0.16)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 46; i++) {
+      const x = this.rng.range(20, BOARD.width - 120);
+      const y = this.rng.range(170, BOARD.height - 20);
+      const w = 18 + this.rng.float() * 30;
+      ctx.beginPath();
+      ctx.arc(x, y, w, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
     }
 
-    // A few rocks on the shore, for a landmark or two in the open ground.
-    for (let i = 0; i < 12; i++) {
-      const col = Math.floor(this.rng.range(0, BOARD.cols));
-      const row = Math.floor(this.rng.range(0, BOARD.rows));
-      if (!isBuildable(col, row)) continue;
-      const c = cellCenter(col, row);
-      const rx = c.x + this.rng.range(-16, 16);
-      const ry = c.y + this.rng.range(-14, 14);
-      const rr = 5 + this.rng.float() * 6;
+    // The shore: a sandy crescent around the lighthouse foot, on the
+    // eastern edge.
+    ctx.fillStyle = '#3a3226';
+    ctx.beginPath();
+    ctx.ellipse(930, 440, 120, 150, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4a4030';
+    ctx.beginPath();
+    ctx.ellipse(930, 440, 96, 122, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // A rocky islet under each furnace, so the furnaces stand on
+    // something in the sea.
+    for (const f of FURNACES) {
       ctx.fillStyle = '#232f47';
       ctx.beginPath();
-      ctx.arc(rx, ry, rr, 0, Math.PI * 2);
+      ctx.ellipse(f.x, f.y + 16, 44, 18, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(150, 170, 200, 0.25)';
+      ctx.fillStyle = 'rgba(150, 170, 200, 0.2)';
       ctx.beginPath();
-      ctx.arc(rx - rr * 0.25, ry - rr * 0.3, rr * 0.45, 0, Math.PI * 2);
+      ctx.ellipse(f.x - 8, f.y + 12, 20, 8, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Landmarks, so the open middle reads as a shore and not an empty
-    // field: standing stones in the northern grass, a beached boat on
-    // the south-west sand, and tide pools catching the moon near the
-    // door. They sit on the base layer, under the towers.
+    // field: standing stones in the northern water, a beached boat on
+    // the south-west sand, and tide pools catching the moon near the door.
     const stones = [
       { x: 6 * BOARD.cell + 32, y: 1 * BOARD.cell + 30 },
       { x: 7 * BOARD.cell + 20, y: 1 * BOARD.cell + 18 },
@@ -154,43 +158,22 @@ export class Renderer {
       ctx.fill();
     }
 
-    // Grass tufts scattered on the buildable ground.
-    for (let i = 0; i < 240; i++) {
-      const x = this.rng.range(0, BOARD.width);
-      const y = this.rng.range(150, BOARD.height);
-      ctx.strokeStyle = PALETTE.grassTuft;
-      ctx.globalAlpha = 0.5 + this.rng.float() * 0.5;
-      ctx.lineWidth = 1.5;
+    // A few rocks on the shore, for a landmark or two in the open ground.
+    for (let i = 0; i < 12; i++) {
+      const col = Math.floor(this.rng.range(0, BOARD.cols));
+      const row = Math.floor(this.rng.range(0, BOARD.rows));
+      const x = col * BOARD.cell + BOARD.cell / 2 + this.rng.range(-16, 16);
+      const y = row * BOARD.cell + BOARD.cell / 2 + this.rng.range(-14, 14);
+      if (x < 700 || y < 150) continue; // keep the sea open
+      const rr = 5 + this.rng.float() * 6;
+      ctx.fillStyle = '#232f47';
       ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - 3, y - 6 - this.rng.float() * 4);
-      ctx.moveTo(x + 2, y);
-      ctx.lineTo(x + 4, y - 5 - this.rng.float() * 4);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    // The path: warm earth, edged with stones.
-    for (const [col, row] of PATH_CELLS) {
-      const x = col * BOARD.cell;
-      const y = row * BOARD.cell;
-      ctx.fillStyle = PALETTE.path;
-      ctx.fillRect(x + 2, y + 2, BOARD.cell - 4, BOARD.cell - 4);
-      ctx.strokeStyle = PALETTE.pathEdge;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 3, y + 3, BOARD.cell - 6, BOARD.cell - 6);
-    }
-    ctx.fillStyle = PALETTE.pathStone;
-    for (const [col, row] of PATH_CELLS) {
-      const x = col * BOARD.cell;
-      const y = row * BOARD.cell;
-      for (let i = 0; i < 3; i++) {
-        const sx = x + this.rng.range(6, BOARD.cell - 6);
-        const sy = y + this.rng.range(6, BOARD.cell - 6);
-        ctx.beginPath();
-        ctx.arc(sx, sy, 2 + this.rng.float() * 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.arc(x, y, rr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(150, 170, 200, 0.25)';
+      ctx.beginPath();
+      ctx.arc(x - rr * 0.25, y - rr * 0.3, rr * 0.45, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -215,146 +198,154 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    this.drawTide(ctx, state, now);
-    this.drawFlareGround(ctx, state, now);
+    this.drawBeam(ctx, state, now);
+    this.drawFurnaces(ctx, state, now);
     this.drawLighthouse(ctx, state, now);
-    this.drawPlacementGuides(ctx, state, view);
-    for (const tower of state.towers) this.drawTower(ctx, tower, now, state);
     for (const enemy of state.enemies) this.drawEnemy(ctx, enemy, now, state);
-    this.drawProjectiles(ctx, state);
-    this.drawFlareBeam(ctx, state, now);
+    this.drawAimGuide(ctx, state, view);
     this.drawEffects(ctx, state);
     this.drawParticles(ctx, particles);
     this.drawBanner(ctx, state);
     ctx.restore();
   }
 
-  // The tide's whole-board treatment, over the base and under the
-  // living things: ash drifting down in Ashfall, a dark cloud with a
-  // gold outline over the middle columns in a Blackout, a still bright
-  // shimmer in Still Air. Only while a wave is running.
-  drawTide(ctx, state, now) {
-    const tide = state.tide;
-    if (!tide || state.phase !== 'wave') return;
-    if (tide === 'ashfall') {
-      ctx.fillStyle = 'rgba(200, 190, 175, 0.55)';
-      for (let i = 0; i < 46; i++) {
-        const x = (i * 137 + now * 14) % BOARD.width;
-        const y = (i * 89 + now * 34) % BOARD.height;
+  // The Keeper's beam: a wedge of light from the lamp, bright while
+  // gathering, faint while only aiming. The cone is the whole game —
+  // it must read at a glance, at thumbnail scale.
+  drawBeam(ctx, state, now) {
+    const beam = state.beam;
+    const gathering = beam.gathering;
+    const angle = beam.angle;
+    const half = BEAM.halfAngle;
+    ctx.save();
+    ctx.translate(LAMP.x, LAMP.y);
+    ctx.rotate(angle);
+    const len = BEAM.length;
+    const alpha = gathering ? 0.5 : 0.26;
+    const grad = ctx.createLinearGradient(0, 0, len, 0);
+    grad.addColorStop(0, `rgba(255, 233, 168, ${alpha})`);
+    grad.addColorStop(0.7, `rgba(255, 213, 120, ${alpha * 0.6})`);
+    grad.addColorStop(1, 'rgba(255, 213, 120, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, len, -half, half);
+    ctx.closePath();
+    ctx.fill();
+    // A bright core line down the middle of the cone, and a gold edge
+    // while gathering, so the cone's edges read.
+    ctx.strokeStyle = gathering ? 'rgba(255, 233, 168, 0.75)' : 'rgba(255, 233, 168, 0.3)';
+    ctx.lineWidth = gathering ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(len, 0);
+    ctx.stroke();
+    if (gathering) {
+      ctx.strokeStyle = 'rgba(255, 215, 106, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(-half) * len, Math.sin(-half) * len);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(half) * len, Math.sin(half) * len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // The furnaces: stone mouths with fire. Lit and ready burns bright;
+  // cooling is dim embers with a ring counting down; unlit is dark
+  // stone. A gold shell marks a furnace that still holds one of the
+  // Moth's shell segments; a broken shell is grey.
+  drawFurnaces(ctx, state, now) {
+    for (const furnace of state.furnaces) {
+      const { x, y } = furnace;
+      const lit = furnace.litFromWatch <= Math.max(state.watch, 1);
+      const cooling = state.now < furnace.coolingUntil;
+      const coolFrac = cooling
+        ? (furnace.coolingUntil - state.now) / 6
+        : 0;
+      // Stone mouth.
+      ctx.fillStyle = '#4a4f63';
+      ctx.beginPath();
+      ctx.moveTo(x - 22, y + 14);
+      ctx.lineTo(x - 14, y - 16);
+      ctx.lineTo(x + 14, y - 16);
+      ctx.lineTo(x + 22, y + 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#2e3247';
+      ctx.beginPath();
+      ctx.ellipse(x, y + 14, 22, 6, 0, 0, Math.PI);
+      ctx.fill();
+      // The fire inside.
+      if (lit && !cooling) {
+        const flick = 1 + Math.sin(now * 9 + x) * 0.18;
+        const glow = ctx.createRadialGradient(x, y - 4, 2, x, y - 4, 30);
+        glow.addColorStop(0, 'rgba(255, 179, 71, 0.8)');
+        glow.addColorStop(1, 'rgba(255, 138, 36, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 30, y - 34, 60, 60);
+        ctx.fillStyle = '#ff8a24';
         ctx.beginPath();
-        ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+        ctx.ellipse(x, y - 6, 9 * flick, 13 * flick, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffe9a8';
+        ctx.beginPath();
+        ctx.ellipse(x, y - 3, 4.5, 7 * flick, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (lit && cooling) {
+        ctx.fillStyle = 'rgba(255, 138, 36, 0.5)';
+        ctx.beginPath();
+        ctx.ellipse(x, y - 4, 6, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // A ring counting the cooldown down.
+        ctx.strokeStyle = 'rgba(255, 215, 106, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, y - 4, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - coolFrac));
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#1a2033';
+        ctx.beginPath();
+        ctx.ellipse(x, y - 4, 8, 10, 0, 0, Math.PI * 2);
         ctx.fill();
       }
-    } else if (tide === 'blackout') {
-      const x0 = BLACKOUT_COLS.from * BOARD.cell;
-      const x1 = (BLACKOUT_COLS.to + 1) * BOARD.cell;
-      ctx.fillStyle = 'rgba(5, 7, 15, 0.38)';
-      ctx.fillRect(x0, 0, x1 - x0, BOARD.height);
-      ctx.strokeStyle = 'rgba(255, 215, 106, 0.55)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 6]);
-      ctx.strokeRect(x0 + 2, 2, x1 - x0 - 4, BOARD.height - 4);
-      ctx.setLineDash([]);
-      ctx.font = 'bold 12px system-ui, sans-serif';
+      // The Moth's shell: gold while the furnace can still break one.
+      ctx.fillStyle = furnace.shard === 'intact' ? '#a86fd0' : '#4a4a5a';
+      ctx.beginPath();
+      ctx.arc(x + 18, y - 22, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = furnace.shard === 'intact' ? '#e0b3ff' : '#6a6a7a';
+      ctx.beginPath();
+      ctx.arc(x + 18, y - 22, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // A gold ring while the beam is over a ready furnace, so the
+      // Keeper can see where a delivery will land.
+      if (lit && !cooling && state.furnaceUnderBeam() === furnace) {
+        ctx.strokeStyle = 'rgba(255, 215, 106, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, y - 2, 32, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // The furnace's name, small, under its mouth.
+      ctx.font = '11px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(255, 215, 106, 0.8)';
-      ctx.fillText('BLACKOUT', (x0 + x1) / 2, 18);
-    } else if (tide === 'stillair') {
-      ctx.fillStyle = 'rgba(255, 240, 200, 0.05)';
-      ctx.fillRect(0, 0, BOARD.width, BOARD.height);
-      for (let i = 0; i < 14; i++) {
-        const x = (i * 211 + now * 8) % BOARD.width;
-        const y = 60 + ((i * 67) % 440);
-        ctx.globalAlpha = 0.2 + 0.3 * Math.abs(Math.sin(now * 1.2 + i));
-        ctx.fillStyle = 'rgba(255, 240, 200, 0.5)';
-        ctx.beginPath();
-        ctx.arc(x, y, 1.4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(232, 236, 247, 0.75)';
+      ctx.fillText(furnace.name, x, y + 32);
     }
   }
 
-  // The Beacon Flare's blazing ground: orange, flickering, brighter at
-  // the centre, with a gold edge so the 3x3 zone reads at a glance.
-  drawFlareGround(ctx, state, now) {
-    const beacon = state.beacon;
-    if (!beacon.flare) return;
-    const z = beacon.zoneCells();
-    const x0 = z.c0 * BOARD.cell;
-    const y0 = z.r0 * BOARD.cell;
-    const w = (z.c1 - z.c0 + 1) * BOARD.cell;
-    const h = (z.r1 - z.r0 + 1) * BOARD.cell;
-    const cx = x0 + w / 2;
-    const cy = y0 + h / 2;
-    const flick = 0.75 + Math.sin(now * 11) * 0.1 + Math.sin(now * 23) * 0.05;
-    const glow = ctx.createRadialGradient(cx, cy, 8, cx, cy, Math.max(w, h) * 0.75);
-    glow.addColorStop(0, `rgba(255, 138, 36, ${0.55 * flick})`);
-    glow.addColorStop(0.6, `rgba(255, 179, 71, ${0.3 * flick})`);
-    glow.addColorStop(1, 'rgba(255, 138, 36, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(x0 - 30, y0 - 30, w + 60, h + 60);
-    ctx.strokeStyle = 'rgba(255, 215, 106, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x0 + 2, y0 + 2, w - 4, h - 4);
-  }
-
-  // The beam from the lighthouse lamp to the blaze, drawn over the
-  // towers and creatures so the shot reads as the lighthouse firing.
-  drawFlareBeam(ctx, state, now) {
-    const beacon = state.beacon;
-    if (!beacon.flare) return;
-    const z = beacon.zoneCells();
-    const cx = ((z.c0 + z.c1) / 2 + 0.5) * BOARD.cell;
-    const cy = ((z.r0 + z.r1) / 2 + 0.5) * BOARD.cell;
-    const lamp = cellCenter(14, 6);
-    const lampX = lamp.x - 4;
-    const lampY = lamp.y + 28 - 118;
-    const angle = Math.atan2(cy - lampY, cx - lampX);
-    const dist = Math.hypot(cx - lampX, cy - lampY);
-    ctx.save();
-    ctx.translate(lampX, lampY);
-    ctx.rotate(angle);
-    const beam = ctx.createLinearGradient(0, 0, dist, 0);
-    beam.addColorStop(0, 'rgba(255, 233, 168, 0.5)');
-    beam.addColorStop(1, 'rgba(255, 179, 71, 0.25)');
-    ctx.fillStyle = beam;
-    ctx.beginPath();
-    ctx.moveTo(0, -5);
-    ctx.lineTo(dist, -34);
-    ctx.lineTo(dist, 34);
-    ctx.lineTo(0, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // The lighthouse: striped tower, lamp room, and a beam that sweeps the
-  // shore. Its flame burns lower as the ember is spent.
+  // The lighthouse: striped tower, lamp room, and a flame that burns
+  // lower as the ember is spent. The sweeping ambient beam is gone —
+  // the Keeper's beam is the light now.
   drawLighthouse(ctx, state, now) {
-    const c = cellCenter(14, 6);
+    const c = { x: 928, y: 416 };
     const baseX = c.x - 4;
     const baseY = c.y + 28;
-    // Beam: a slow sweeping cone from the lamp.
     const lampX = baseX;
     const lampY = baseY - 118;
-    const beamAngle = -Math.PI / 2 + Math.sin(now * 0.35) * 0.9;
-    ctx.save();
-    ctx.translate(lampX, lampY);
-    ctx.rotate(beamAngle);
-    const beam = ctx.createLinearGradient(0, 0, 380, 0);
-    beam.addColorStop(0, 'rgba(255, 233, 168, 0.38)');
-    beam.addColorStop(1, 'rgba(255, 233, 168, 0)');
-    ctx.fillStyle = beam;
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(380, -64);
-    ctx.lineTo(380, 64);
-    ctx.lineTo(0, 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
     // Tower body with stripes.
     ctx.fillStyle = '#d8d2c2';
     ctx.fillRect(baseX - 16, baseY - 96, 32, 96);
@@ -389,173 +380,17 @@ export class Renderer {
     ctx.fill();
   }
 
-  // Ghost cell, range ring and the selected tower's reach.
-  drawPlacementGuides(ctx, state, view) {
-    const { hover, placeType, selected } = view;
-    if (selected) {
-      ctx.strokeStyle = 'rgba(255, 215, 106, 0.7)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(selected.x, selected.y, selected.range, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(255, 215, 106, 0.12)';
-      ctx.fill();
-    }
-    if (hover && placeType && (state.phase === 'build' || state.phase === 'wave')) {
-      const tower = state.towerAt(hover.col, hover.row);
-      const ok = !tower && state.canAfford(view.placeDef.cost);
-      const cx = hover.col * BOARD.cell;
-      const cy = hover.row * BOARD.cell;
-      ctx.fillStyle = ok ? 'rgba(125, 219, 138, 0.25)' : 'rgba(255, 90, 90, 0.25)';
-      ctx.fillRect(cx + 2, cy + 2, BOARD.cell - 4, BOARD.cell - 4);
-      ctx.strokeStyle = ok ? PALETTE.ok : PALETTE.danger;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cx + 2, cy + 2, BOARD.cell - 4, BOARD.cell - 4);
-      if (ok) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.beginPath();
-        ctx.arc(cx + BOARD.cell / 2, cy + BOARD.cell / 2, view.placeDef.range, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-    // Aiming the Beacon: the 3x3 patch the flare will set alight, with
-    // its price, so the click is a decision made with open eyes.
-    if (view.beaconArmed && hover && state.phase === 'wave') {
-      const r = BEACON.radiusCells;
-      const c0 = Math.max(0, hover.col - r);
-      const c1 = Math.min(BOARD.cols - 1, hover.col + r);
-      const r0 = Math.max(0, hover.row - r);
-      const r1 = Math.min(BOARD.rows - 1, hover.row + r);
-      ctx.fillStyle = 'rgba(255, 138, 36, 0.3)';
-      ctx.fillRect(c0 * BOARD.cell + 2, r0 * BOARD.cell + 2, (c1 - c0 + 1) * BOARD.cell - 4, (r1 - r0 + 1) * BOARD.cell - 4);
-      ctx.strokeStyle = '#ffb347';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(c0 * BOARD.cell + 2, r0 * BOARD.cell + 2, (c1 - c0 + 1) * BOARD.cell - 4, (r1 - r0 + 1) * BOARD.cell - 4);
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#ffd76a';
-      const labelY = Math.max(14, r0 * BOARD.cell - 6);
-      ctx.fillText('Beacon Flare · 2 ember', (c0 + c1 + 1) * BOARD.cell / 2, labelY);
-    }
-  }
-
-  drawTower(ctx, tower, now, state) {
-    const { x, y } = tower;
-    const def = tower.def;
-    const glow = ctx.createRadialGradient(x, y, 4, x, y, tower.range * 0.55);
-    glow.addColorStop(0, def.glowInner);
-    glow.addColorStop(1, def.glowOuter);
-    ctx.fillStyle = glow;
-    ctx.fillRect(x - tower.range * 0.55, y - tower.range * 0.55, tower.range * 1.1, tower.range * 1.1);
-
-    // Stone base.
-    ctx.fillStyle = '#4a4f63';
-    ctx.beginPath();
-    ctx.arc(x, y + 4, 20, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#2e3247';
-    ctx.beginPath();
-    ctx.arc(x, y + 4, 20, 0, Math.PI);
-    ctx.fill();
-
-    if (tower.type === 'brazier') {
-      // Bowl and a flickering flame.
-      ctx.fillStyle = '#6b5a49';
-      ctx.beginPath();
-      ctx.arc(x, y - 2, 13, 0, Math.PI);
-      ctx.fill();
-      const flick = 1 + Math.sin(now * 9 + tower.col) * 0.15;
-      ctx.fillStyle = def.color;
-      ctx.beginPath();
-      ctx.ellipse(x, y - 10, 7 * flick, 11 * flick, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff6d8';
-      ctx.beginPath();
-      ctx.ellipse(x, y - 7, 3.5, 6 * flick, 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (tower.type === 'lantern') {
-      // A post with a hanging lantern that sways.
-      ctx.strokeStyle = '#3a3f52';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(x, y + 14);
-      ctx.lineTo(x, y - 14);
-      ctx.stroke();
-      const sway = Math.sin(now * 1.4 + tower.row) * 3;
-      ctx.fillStyle = def.color;
-      ctx.beginPath();
-      ctx.arc(x + sway, y - 18, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#eaf6ff';
-      ctx.beginPath();
-      ctx.arc(x + sway, y - 18, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (tower.type === 'bell') {
-      // Tide Bell: a post with a hanging bell that swings as it rings.
-      ctx.strokeStyle = '#3a3f52';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(x, y + 14);
-      ctx.lineTo(x, y - 12);
-      ctx.stroke();
-      const swing = Math.sin(now * 2.2 + tower.col) * 2;
-      ctx.fillStyle = def.color;
-      ctx.beginPath();
-      ctx.moveTo(x + swing - 9, y - 8);
-      ctx.lineTo(x + swing + 9, y - 8);
-      ctx.lineTo(x + swing + 5, y - 20);
-      ctx.lineTo(x + swing - 5, y - 20);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#eafff5';
-      ctx.beginPath();
-      ctx.arc(x + swing, y - 6, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // Storm spire: a crystal that hums, drawn pointing at its target.
-      ctx.save();
-      ctx.translate(x, y - 6);
-      ctx.rotate(tower.angle + Math.PI / 2);
-      ctx.fillStyle = def.color;
-      ctx.beginPath();
-      ctx.moveTo(0, -18);
-      ctx.lineTo(9, 6);
-      ctx.lineTo(0, 12);
-      ctx.lineTo(-9, 6);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#efe6ff';
-      ctx.beginPath();
-      ctx.moveTo(0, -12);
-      ctx.lineTo(4, 4);
-      ctx.lineTo(0, 8);
-      ctx.lineTo(-4, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Muzzle flash when it fires.
-    if (tower.flash > 0) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.beginPath();
-      ctx.arc(x + Math.cos(tower.angle) * 20, y + Math.sin(tower.angle) * 20, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Level pips under the tower.
-    for (let i = 0; i < tower.level; i++) {
-      ctx.fillStyle = PALETTE.gold;
-      ctx.beginPath();
-      ctx.arc(x - 10 + i * 10, y + 22, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   drawEnemy(ctx, enemy, now, state) {
-    const { x, y } = enemy;
+    // A caught creature hangs in the beam at its slot, struggling;
+    // anything else walks where it stands.
+    let x = enemy.x;
+    let y = enemy.y;
+    if (enemy.isCaught()) {
+      const pos = state.beam.slotPosition(enemy.slot, now, enemy.wobble);
+      x = pos.x;
+      y = pos.y;
+    }
     const bob = Math.sin(now * 5 + enemy.wobble) * 2;
-    const chilled = now < enemy.slowUntil;
-    const inFlare = state && state.beacon ? state.beacon.inZone(enemy) : false;
     ctx.save();
     ctx.translate(x, y + bob * 0.4);
 
@@ -639,137 +474,69 @@ export class Renderer {
       ctx.arc(-5, -6, 3, 0, Math.PI * 2);
       ctx.arc(5, -6, 3, 0, Math.PI * 2);
       ctx.fill();
+      // The Moth's shell: one pip per segment still unbroken.
+      const left = 3 - state.mothSegmentsBroken;
+      for (let i = 0; i < left; i++) {
+        ctx.fillStyle = '#a86fd0';
+        ctx.beginPath();
+        ctx.arc(-10 + i * 10, -enemy.radius - 12, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // A chill ring while slowed.
-    if (chilled) {
-      ctx.strokeStyle = 'rgba(127, 212, 255, 0.8)';
-      ctx.lineWidth = 2;
+    // A caught creature struggles: a gold ring counting its escape
+    // time down, and a tether back to the lamp.
+    if (enemy.isCaught()) {
+      const frac = enemy.escapeFraction(now);
+      ctx.strokeStyle = frac > 0.5 ? 'rgba(255, 215, 106, 0.9)' : 'rgba(255, 90, 90, 0.9)';
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2);
+      ctx.arc(0, 0, enemy.radius + 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
       ctx.stroke();
     }
-    // An orange ring while the creature stands in the Beacon's blaze.
-    if (inFlare) {
-      ctx.strokeStyle = 'rgba(255, 138, 36, 0.9)';
+    // Just escaped: a faint grey ring while it cannot be caught again.
+    if (enemy.state === 'free' && now < enemy.resistUntil) {
+      ctx.strokeStyle = 'rgba(154, 167, 199, 0.6)';
       ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.arc(0, 0, enemy.radius + 7, 0, Math.PI * 2);
+      ctx.arc(0, 0, enemy.radius + 5, 0, Math.PI * 2);
       ctx.stroke();
-    }
-    // A Tide Bell's mark: a gold diamond over the creature, so the
-    // player can see which foe the next hit will land harder on.
-    if (enemy.isMarked(now)) {
-      ctx.fillStyle = '#ffd76a';
-      ctx.beginPath();
-      ctx.moveTo(0, -enemy.radius - 14);
-      ctx.lineTo(5, -enemy.radius - 8);
-      ctx.lineTo(0, -enemy.radius - 2);
-      ctx.lineTo(-5, -enemy.radius - 8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 215, 106, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.setLineDash([]);
     }
     ctx.restore();
-
-    // Health bar, only when hurt.
-    if (enemy.hp < enemy.maxHp) {
-      const w = enemy.radius * 2 + 6;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillRect(x - w / 2, y - enemy.radius - 12, w, 5);
-      ctx.fillStyle = enemy.hpFraction() > 0.5 ? '#7ddb8a' : enemy.hpFraction() > 0.25 ? '#ffd76a' : '#ff5a5a';
-      ctx.fillRect(x - w / 2, y - enemy.radius - 12, w * enemy.hpFraction(), 5);
-    }
   }
 
-  drawProjectiles(ctx, state) {
-    for (const p of state.projectiles) {
-      const color = p.tower.def.color;
-      ctx.strokeStyle = color + '88';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      for (const point of p.trail) ctx.lineTo(point.x, point.y);
-      ctx.stroke();
-      const glow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 10);
-      glow.addColorStop(0, '#ffffff');
-      glow.addColorStop(0.4, color);
-      glow.addColorStop(1, color + '00');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  // A faint line from the lamp toward the pointer, so the Keeper can
+  // see where the beam is turning before it gets there.
+  drawAimGuide(ctx, state, view) {
+    const hover = view.hover;
+    if (!hover || (state.phase !== 'watch' && state.phase !== 'build')) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 233, 168, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(LAMP.x, LAMP.y);
+    ctx.lineTo(hover.x, hover.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255, 233, 168, 0.6)';
+    ctx.beginPath();
+    ctx.arc(hover.x, hover.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawEffects(ctx, state) {
     for (const e of state.effects) {
-      const a = 1 - e.t / 0.35;
-      if (e.kind === 'hit') {
-        ctx.strokeStyle = e.color;
-        ctx.globalAlpha = a;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 4 + e.t * 60, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'chill') {
-        ctx.strokeStyle = 'rgba(127, 212, 255, 0.9)';
-        ctx.globalAlpha = a;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 6 + e.t * 40, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'bolt') {
-        ctx.strokeStyle = e.color;
-        ctx.globalAlpha = a;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        const midX = (e.x1 + e.x2) / 2 + (Math.random() - 0.5) * 18;
-        const midY = (e.y1 + e.y2) / 2 + (Math.random() - 0.5) * 18;
-        ctx.moveTo(e.x1, e.y1);
-        ctx.lineTo(midX, midY);
-        ctx.lineTo(e.x2, e.y2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'pulse') {
-        // A Tide Bell's ring, widening as it fades.
-        ctx.strokeStyle = e.color;
-        ctx.globalAlpha = a * 0.8;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 10 + (1 - a) * (e.range || 150), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'mark') {
-        // The gold burst when a mark is spent by a hit.
-        ctx.fillStyle = '#ffd76a';
-        ctx.globalAlpha = a;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 4 + (1 - a) * 16, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'split') {
-        // The Dread Moth splitting: a purple burst where the wisps are born.
+      const a = 1 - e.t / 0.4;
+      if (e.kind === 'burn' || e.kind === 'catch') {
         ctx.strokeStyle = e.color;
         ctx.globalAlpha = a;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(e.x, e.y, 8 + (1 - a) * 46, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (e.kind === 'shadow') {
-        // The Moth's shadow falling: a dark ring closing in.
-        ctx.strokeStyle = 'rgba(61, 43, 82, 0.9)';
-        ctx.globalAlpha = a;
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 90 - (1 - a) * 50, 0, Math.PI * 2);
+        ctx.arc(e.x, e.y, 6 + (1 - a) * 30, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
@@ -797,8 +564,8 @@ export class Renderer {
   }
 
   drawBanner(ctx, state) {
-    if (!state.waveBanner) return;
-    const { text, until } = state.waveBanner;
+    if (!state.watchBanner) return;
+    const { text, until } = state.watchBanner;
     const remain = until - state.now;
     const alpha = Math.min(1, remain / 0.5, (2.2 - remain) / 0.3 + 0.4);
     ctx.save();

@@ -25,6 +25,7 @@ body {
   background: #1c2742; overflow: hidden; vertical-align: middle; margin-left: 4px;
 }
 #ember-bar { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff8a24, #ffd76a); }
+#net-bar { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #ffe9a8, #ffd76a); }
 .spacer { flex: 1; }
 button {
   background: #1c2a4a; color: #e8ecf7; border: 1px solid #3a4f7d;
@@ -69,23 +70,6 @@ button:disabled { opacity: 0.45; cursor: default; }
 .stats { display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: center; margin: 6px 0 22px; font-size: 15px; }
 .stats b { color: #ffd76a; font-size: 19px; }
 
-/* --- Blessing picker --- */
-#blessing-title { font-size: 40px; }
-.blessing-cards { display: flex; gap: 14px; margin: 6px 0 4px; }
-.blessing-card {
-  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
-  width: 220px; text-align: left; padding: 14px 14px 12px; border-radius: 10px;
-  background: #141d38; border: 1px solid #ffb347; color: #e8ecf7; cursor: pointer;
-}
-.blessing-card:hover { background: #2a2113; box-shadow: 0 0 0 1px #ffb347; }
-.blessing-key {
-  grid-row: span 3; align-self: center; font-weight: 800; font-size: 17px;
-  color: #ffd76a; border: 1px solid #3a4f7d; border-radius: 6px; padding: 3px 7px;
-}
-.blessing-icon { font-size: 22px; }
-.blessing-name { font-weight: 700; font-size: 15px; color: #ffd76a; }
-.blessing-blurb { grid-column: 2 / 3; font-size: 13px; color: #e8ecf7; font-weight: 600; }
-.blessing-detail { grid-column: 2 / 3; font-size: 12px; color: #9aa7c7; line-height: 1.45; }
 
 /* --- Side panel --- */
 #panel {
@@ -94,39 +78,8 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 #panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: #9aa7c7; margin: 12px 0 8px; }
 #panel h2:first-child { margin-top: 0; }
-#shop { display: flex; flex-direction: column; gap: 8px; }
-.shop-card {
-  display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px;
-  text-align: left; padding: 9px 11px; border-radius: 8px;
-  background: #141d38; border: 1px solid #2a3a5f; color: #e8ecf7; cursor: pointer;
-}
-.shop-card:hover { border-color: #ffb347; }
-.shop-card.picked { border-color: #ffb347; background: #2a2113; box-shadow: 0 0 0 1px #ffb347; }
-.shop-card.poor { opacity: 0.55; }
-.shop-key {
-  grid-row: span 3; align-self: center; font-weight: 800; font-size: 17px;
-  color: #ffd76a; border: 1px solid #3a4f7d; border-radius: 6px; padding: 3px 7px;
-}
-.shop-name { font-weight: 700; font-size: 14px; }
-.shop-cost { font-size: 13px; color: #ffd76a; font-weight: 700; }
-.shop-blurb { grid-column: 2 / 4; font-size: 12px; color: #c6cfe6; }
-.shop-stats { grid-column: 2 / 4; font-size: 11px; color: #9aa7c7; }
-#selected p { font-size: 13px; margin: 4px 0; }
-#selected h3 { margin: 0 0 4px; font-size: 15px; }
-#selected .row { display: flex; gap: 8px; margin-top: 8px; }
-#selected .row button { flex: 1; }
 .hint { font-size: 12.5px; color: #9aa7c7; line-height: 1.5; margin: 4px 0; }
 .hint.strong { font-size: 13.5px; color: #ffd76a; font-weight: 600; }
-/* The tide forecast under the next-wave line. */
-.tide { font-size: 13px; color: #ffd76a; line-height: 1.5; margin: 4px 0; min-height: 19px; }
-.tide:empty { display: none; }
-/* The Beacon Flare: the lighthouse's own weapon, in the side panel. */
-.beacon-btn {
-  width: 100%; padding: 10px 11px; font-size: 14px; font-weight: 700;
-  background: #7a4a12; border: 1px solid #ffb347; color: #fff3d6; border-radius: 8px;
-}
-.beacon-btn:hover:not(:disabled) { background: #96600f; }
-#beacon-note { margin-top: 6px; }
 .advice { font-size: 13px; color: #ffb347; line-height: 1.5; margin: 6px 0 0; min-height: 19px; }
 .advice:empty { display: none; }
 .notes { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: #c6cfe6; }

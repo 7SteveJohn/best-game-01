@@ -1,8 +1,9 @@
-// Emberlight — the numbers that define the game.
+// Emberlight v5 — "Net the Night": the numbers that define the game.
 //
-// One file holds every tunable value so the balance lives in one place:
-// the board, the three towers, the five creatures, the twelve waves, and
-// the palette the whole scene is painted from.
+// The lighthouse beam no longer damages anything. It catches the dark
+// and carries it to the furnaces. One file holds every tunable value:
+// the board, the beam, the net, the furnaces, the creatures, the eight
+// watches, and the palette the whole scene is painted from.
 export const BOARD = {
   cols: 15,
   rows: 9,
@@ -11,126 +12,67 @@ export const BOARD = {
   height: 576, // rows * cell
 };
 
-// The winding shore path, as grid cells, from the western dark to the
-// lighthouse door. Everything else is buildable ground.
-export const PATH_CELLS = [
-  [0, 4], [1, 4], [2, 4], [3, 4],
-  [3, 5], [3, 6], [3, 7],
-  [4, 7], [5, 7], [6, 7], [7, 7], [8, 7],
-  [8, 6], [8, 5], [8, 4], [8, 3], [8, 2],
-  [9, 2], [10, 2], [11, 2], [12, 2],
-  [12, 3], [12, 4], [12, 5], [12, 6],
-  [13, 6], [14, 6],
-];
+// The lighthouse lamp the beam pivots on, and the door the creatures
+// walk toward. The lamp stands high on the tower; the door is at its
+// foot, on the eastern edge.
+export const LAMP = { x: 924, y: 326 };
+export const DOOR = { x: 924, y: 440 };
 
-// The lighthouse stands at the end of the path, on the eastern edge.
-export const LIGHTHOUSE_CELL = { col: 14, row: 6 };
+// The three ember furnaces, arranged around the lighthouse at three
+// different angles from the lamp, so each delivery is a different
+// swing of the beam. A furnace only lights from its watch on: the
+// Keeper learns the game one furnace at a time.
+export const FURNACES = [
+  { id: 'west', name: 'West Furnace', x: 500, y: 330, litFromWatch: 1 },
+  { id: 'north', name: 'North Furnace', x: 620, y: 110, litFromWatch: 2 },
+  { id: 'south', name: 'South Furnace', x: 620, y: 530, litFromWatch: 3 },
+];
+export const FURNACE_COOLDOWN = 6; // seconds a furnace needs after a burn
+export const FURNACE_REACH = 480; // how far from the lamp a delivery can land
+export const FURNACE_AIM_TOLERANCE = 0.07; // radians of slack past the cone edge
+
+// The beam: it turns toward the pointer at a capped rate, so aiming
+// answers at once without teleporting. It gathers only while the
+// Keeper holds the button down.
+export const BEAM = {
+  turnRate: Math.PI, // radians per second: 180 degrees
+  halfAngle: 0.192, // radians: an 11-degree half-angle, a 22-degree cone
+  gatherTime: 0.25, // seconds a creature must stay in the cone to be caught
+  length: 520, // pixels the visible cone reaches
+  // Where a captured creature hangs, in pixels from the lamp along the
+  // beam, by capture order. The moth hangs in the middle slot alone.
+  slotDistances: [150, 205, 260, 315, 370],
+};
+
+// The net: what the beam can hold, and for how long. A creature that
+// is caught stops walking; when it is freed or escapes, it goes back
+// to where it was caught and carries on — catching never resets its
+// journey, and never advances it either.
+export const NET = {
+  capacity: 5, // weight units the beam can carry at once
+  escapeTime: 3.0, // seconds a captured creature struggles before breaking free
+  wraithEscapeTime: 1.8, // wraiths are quicker to slip the light
+  resistTime: 1.0, // seconds after an escape during which a creature cannot be caught again
+};
 
 export const ECONOMY = {
-  startGold: 160,
   startEmber: 12, // hits the ember can take before the light dies
-  sellRefund: 0.7,
-  waveClearBonus: 20,
-  waveClearPerWave: 4,
-  upgradeCostFactor: 0.6, // of the tower's base cost, per level, for later upgrades
-  upgradeCostFactorFirst: 0.5, // of the tower's base cost, for the first upgrade
-  upgradeDamageFactor: 0.35, // +35% damage per level
-  upgradeRangeFactor: 0.1, // +10% range per level
-  maxLevel: 3,
+  scorePerCreature: 100, // points for each creature burned in a furnace
+  scorePerExtra: 25, // bonus for each additional creature in the same delivery
+  mothSegmentBonus: 500, // points for breaking one of the Moth's shell segments
+  winEmberBonus: 50, // points per ember left on a win
 };
 
-// The three towers the Keeper can build. damage is per shot, rate is shots
-// per second, range and projectile speed are in pixels.
-export const TOWERS = {
-  brazier: {
-    id: 'brazier',
-    name: 'Ember Brazier',
-    key: '1',
-    cost: 50,
-    damage: 11,
-    rate: 2.4,
-    range: 112,
-    projectileSpeed: 400,
-    color: '#ffb347',
-    glow: '#ff7a1a',
-    glowInner: '#ff7a1a99',
-    glowOuter: '#ff7a1a22',
-    blurb: 'Cheap and quick. A hungry little flame.',
-    detail: 'Fast shots, short reach. Best in numbers.',
-  },
-  lantern: {
-    id: 'lantern',
-    name: 'Frost Lantern',
-    key: '2',
-    cost: 75,
-    damage: 6,
-    rate: 1.1,
-    range: 132,
-    projectileSpeed: 340,
-    slowFactor: 0.45, // multiplies enemy speed while chilled
-    slowSeconds: 1.8,
-    color: '#7fd4ff',
-    glow: '#2f7fd0',
-    glowInner: '#2f9fe066',
-    glowOuter: '#2f9fe018',
-    blurb: 'Cold light that holds the dark still.',
-    detail: 'Chills what it hits, halving its speed.',
-  },
-  spire: {
-    id: 'spire',
-    name: 'Storm Spire',
-    key: '3',
-    cost: 110,
-    damage: 40,
-    rate: 0.55,
-    range: 172,
-    projectileSpeed: 560,
-    chainTargets: 2, // extra creatures the bolt jumps to
-    chainFalloff: 0.65, // damage kept per jump
-    color: '#c9a7ff',
-    glow: '#7b4dff',
-    glowInner: '#8b6cff66',
-    glowOuter: '#7b4dff18',
-    blurb: 'A crystal that calls the storm down.',
-    detail: 'Slow, heavy bolts that leap between foes.',
-  },
-  // The Tide Bell fires no shot. Every few seconds it rings, and every
-  // creature its sound reaches is marked: the next tower hit on a marked
-  // creature lands much harder. It is the answer to brutes and the boss,
-  // and nearly useless against wisps that die to one flame anyway.
-  bell: {
-    id: 'bell',
-    name: 'Tide Bell',
-    key: '4',
-    cost: 90,
-    damage: 0,
-    rate: 0,
-    range: 150,
-    projectileSpeed: 0,
-    pulseInterval: 3.2, // seconds between rings
-    markSeconds: 1.2, // how long a mark lasts
-    markBonus: 15, // extra damage on the next hit on a marked creature
-    color: '#8fe3c0',
-    glow: '#2fae7d',
-    glowInner: '#2fae7d66',
-    glowOuter: '#2fae7d18',
-    blurb: 'A bell that marks the dark for death.',
-    detail: 'Rings every 3.2s. Marked foes take +15 on the next hit.',
-  },
-};
-
-export const TOWER_ORDER = ['brazier', 'lantern', 'spire', 'bell'];
-
-// The creatures that crawl out of the dark. hp scales with the wave;
-// speed is pixels per second; leak is how much ember a creature costs
-// when it reaches the lighthouse.
+// The creatures that crawl out of the dark. They have no health now —
+// nothing damages them. weight is what they cost the net; speed is
+// pixels per second straight toward the lighthouse door; leak is how
+// much ember one costs when it reaches it.
 export const ENEMIES = {
   wisp: {
     id: 'wisp',
     name: 'Wisp',
-    hp: 30,
-    speed: 56,
-    reward: 6,
+    weight: 1,
+    speed: 85, // crosses the sea in about 10 seconds
     leak: 1,
     radius: 10,
     color: '#ffe9a8',
@@ -139,9 +81,8 @@ export const ENEMIES = {
   shade: {
     id: 'shade',
     name: 'Shade',
-    hp: 78,
-    speed: 41,
-    reward: 9,
+    weight: 1,
+    speed: 53, // about 16 seconds from the dark edge
     leak: 1,
     radius: 13,
     color: '#5a5f8a',
@@ -150,9 +91,8 @@ export const ENEMIES = {
   brute: {
     id: 'brute',
     name: 'Brute',
-    hp: 240,
-    speed: 27,
-    reward: 20,
+    weight: 3,
+    speed: 35, // about 24 seconds, but it costs 2 ember
     leak: 2,
     radius: 18,
     color: '#7a4a3a',
@@ -161,21 +101,18 @@ export const ENEMIES = {
   wraith: {
     id: 'wraith',
     name: 'Wraith',
-    hp: 60,
-    speed: 76,
-    reward: 14,
+    weight: 2,
+    speed: 90, // the fastest thing on the sea
     leak: 1,
     radius: 11,
     color: '#bfe8e0',
     core: '#eafff8',
-    regen: 2.5, // hit points regained per second
   },
   moth: {
     id: 'moth',
     name: 'Dread Moth',
-    hp: 2400,
-    speed: 24,
-    reward: 150,
+    weight: 5, // fills the whole net by itself
+    speed: 25, // slow, huge, and patient
     leak: 5,
     radius: 30,
     color: '#3d2b52',
@@ -183,119 +120,47 @@ export const ENEMIES = {
   },
 };
 
-// How a creature's health grows as the waves deepen. The curve is
-// gentle early, so a new Keeper learns the ropes, and steep late: a
-// wave-12 board must be strong to hold the shore.
-export function enemyHpFor(type, wave) {
-  const base = ENEMIES[type].hp;
-  return Math.round(base * (1 + 0.14 * (wave - 1) + 0.015 * (wave - 1) * (wave - 1)));
-}
-
-// Twelve waves. Each entry lists how many of each creature march, in
-// spawn order groups; the builder in levels.js turns it into a queue.
-export const WAVES = [
-  { wisp: 12 },
-  { wisp: 14, shade: 4 },
-  { wisp: 10, shade: 8 },
-  { wisp: 14, shade: 8, wraith: 4 },
-  { shade: 12, wraith: 6, brute: 2 },
-  { wisp: 18, shade: 10, brute: 4 },
-  { shade: 14, wraith: 10, brute: 4 },
-  { wisp: 20, brute: 8, wraith: 8 },
-  { shade: 18, brute: 8, wraith: 12 },
-  { brute: 16, wraith: 16, shade: 10 },
-  { brute: 18, wraith: 22, shade: 14, wisp: 20 },
-  { moth: 1, brute: 14, wraith: 16 },
+// Eight watches. Each entry lists how many of each creature arrive,
+// in spawn order groups, and which directions they come from. The
+// builder in levels.js turns it into a timed queue.
+export const WATCHES = [
+  { wisp: 8 },
+  { wisp: 10, shade: 4 },
+  { wisp: 8, shade: 6, brute: 2 },
+  { wisp: 10, shade: 8, wraith: 2, brute: 2 },
+  { shade: 12, wraith: 4, brute: 4 },
+  { wisp: 14, shade: 10, wraith: 4, brute: 4 },
+  { shade: 10, wraith: 8, brute: 6 },
+  { moth: 1, wisp: 10, shade: 8, wraith: 4, brute: 4 },
 ];
 
-export const TOTAL_WAVES = WAVES.length;
+export const TOTAL_WATCHES = WATCHES.length;
 
-// Spawn pacing: seconds between creatures in a wave, shrinking as the
-// waves deepen so later marches feel like a flood. The first two waves
-// spawn faster than before, so the opening screen is visibly populated;
-// from wave 3 on the pacing is the first version's, which the balance
-// was tuned against.
-export function spawnGapFor(wave) {
-  if (wave === 1) return 0.65;
-  if (wave === 2) return 0.62;
-  return Math.max(0.35, 0.9 - wave * 0.045);
+// Which stretches of the dark edge a watch arrives from. The first
+// watch comes from one direction only, so the Keeper learns to catch
+// before learning to choose.
+export function directionsFor(watch) {
+  if (watch === 1) return ['north'];
+  if (watch === 2) return ['north', 'south'];
+  return ['north', 'middle', 'south'];
 }
 
-// The Beacon Flare: the lighthouse burns its own light as a weapon.
-// Mid-wave the Keeper may fire it once, at a cell they click: the
-// 3x3 ground around that cell blazes for four seconds, 30 damage a
-// second and a 35% slow, for 2 ember. It costs health to save health —
-// a real trade, not a free button — and it needs at least 3 ember left
-// to fire, so the Keeper can never burn the last light itself.
-export const BEACON = {
-  costEmber: 2,
-  minEmber: 3, // ember the lighthouse must still hold to fire
-  duration: 4, // seconds the ground blazes
-  dps: 30, // damage per second to each creature in the zone
-  slowFactor: 0.65, // speed inside the blaze; a lantern's chill is stronger
-  radiusCells: 1, // half-width in cells: a 3x3 zone around the aimed cell
-};
-
-// The Tides: one condition per wave, on a fixed three-wave rotation, so
-// the shore is never the same march twice and the Keeper can plan for
-// what is coming. The forecast is shown before the wave starts.
-// Still Air: the first tower hit on each creature lands 50% harder.
-// Ashfall: every tower's reach shrinks 8%. Blackout: towers standing in
-// columns 6-10 (counted from the left) fire 10% slower. The final wave
-// is always Still Air — the last stand, under the clearest sky.
-export const TIDES = {
-  stillair: {
-    id: 'stillair',
-    name: 'Still Air',
-    icon: '🌤',
-    blurb: 'First hits strike +50%.',
-    detail: 'The air holds still: the first tower hit on each creature lands half as hard again.',
-    firstHitBonus: 0.5,
-  },
-  ashfall: {
-    id: 'ashfall',
-    name: 'Ashfall',
-    icon: '🌫',
-    blurb: 'Tower range −8%.',
-    detail: 'Ash drifts over the shore: every tower reaches 8% less far, bells included.',
-    rangeFactor: 0.92,
-  },
-  blackout: {
-    id: 'blackout',
-    name: 'Blackout',
-    icon: '🌑',
-    blurb: 'Towers in columns 6–10 fire 10% slower.',
-    detail: 'A black cloud hangs over the middle of the board: towers standing there fire a tenth slower.',
-    fireRateFactor: 0.9,
-  },
-};
-
-// The middle columns the Blackout hangs over, counted from zero.
-export const BLACKOUT_COLS = { from: 5, to: 9 };
-
-export function tideFor(wave) {
-  // The last wave is always Still Air: the air holds still for the
-  // final stand, and the towers hit their hardest when it matters
-  // most. A Blackout over the Moth's wave would stack a tenth-slower
-  // fire on top of the hardest wave in the game, and the bot runs
-  // showed the line breaking there — a second creature slipping
-  // through beside the Moth, where the third version leaked only it.
-  if (wave === TOTAL_WAVES) return 'stillair';
-  const m = wave % 3;
-  if (m === 1) return 'stillair';
-  if (m === 2) return 'ashfall';
-  return 'blackout';
+// Spawn pacing: seconds between creatures in a watch. A watch's
+// arrivals last about 24 seconds; the cleanup after is the Keeper's.
+export function spawnGapFor(watch) {
+  return Math.max(0.45, 0.85 - watch * 0.04);
 }
-// The ground values were lifted from the first version so the board
-// keeps its structure when a screenshot is shrunk: the path and the
-// build ground still read as different places in the dark.
+
+// The ground values were lifted from the tower-defense version so the
+// board keeps its structure when a screenshot is shrunk: the sea and
+// the shore still read as different places in the dark.
 export const PALETTE = {
   skyTop: '#070b1d',
   skyMid: '#0d1531',
   ground: '#17263a',
   groundAlt: '#142338',
   grassTuft: '#315344',
-  path: '#5a4a3a', // the trodden lane — bright enough to read at thumbnail scale
+  path: '#5a4a3a',
   pathEdge: '#8a7358',
   pathStone: '#92785c',
   moon: '#f4ead0',

@@ -1,121 +1,106 @@
-// Emberlight — the creatures that crawl out of the dark.
+// Emberlight v5 — the creatures that crawl out of the dark.
 //
-// An Enemy walks the waypoint path, takes damage, can be chilled, and
-// heals a little if it is a wraith. When it reaches the lighthouse door
-// it spends itself against the ember and is gone.
-import { BEACON, BOARD, ENEMIES, enemyHpFor } from './config.js';
-import { WAYPOINTS } from './levels.js';
+// An Enemy walks straight from the dark edge toward the lighthouse
+// door. It has no health: nothing damages it. It can be caught in the
+// beam, carried, and burned in a furnace — or it can break free and
+// carry on from where it was caught. When it reaches the door it
+// spends itself against the ember and is gone.
+import { BOARD, DOOR, ENEMIES, NET } from './config.js';
 
 let nextId = 1;
 
 export class Enemy {
-  constructor(type, wave, at = null) {
+  constructor(type, watch, at = null) {
     const def = ENEMIES[type];
     this.id = nextId++;
     this.type = type;
     this.name = def.name;
-    this.maxHp = enemyHpFor(type, wave);
-    this.hp = this.maxHp;
+    this.weight = def.weight;
     this.speed = def.speed;
-    this.reward = def.reward;
     this.leak = def.leak;
     this.radius = def.radius;
     this.color = def.color;
     this.core = def.core;
-    this.regen = def.regen || 0;
-    // Where it starts: the western dark, unless the caller places it
-    // mid-path — the Dread Moth's split wisps are born where it stands.
+    // Where it starts: the dark edge, unless the caller places it —
+    // the Dread Moth's return trips and the screenshot staging do.
     if (at) {
       this.x = at.x;
       this.y = at.y;
-      this.waypoint = at.waypoint;
-      this.distance = at.distance || 0;
     } else {
-      this.x = WAYPOINTS[0].x;
-      this.y = WAYPOINTS[0].y;
-      this.waypoint = 1; // next waypoint to walk toward
-      this.distance = 0; // how far along the path it has walked
+      this.x = 30 + Math.random() * 60;
+      this.y = 60 + Math.random() * 480;
     }
-    this.slowUntil = 0; // game clock; chilled while now < slowUntil
-    this.slowFactor = 1;
-    // A Tide Bell's mark: the next tower hit on this creature lands
-    // harder, then the mark is spent.
-    this.markedUntil = 0;
-    this.markBonus = 0;
-    // The Beacon's blaze: a 35% slow while the ground burns under it.
-    this.flareUntil = 0;
-    // Still Air: the first tower hit on this creature lands half as
-    // hard again. Each creature gets its own allowance, once.
-    this.firstHitUsed = false;
-    // The Dread Moth alone has phases: it splits at two thirds of its
-    // health and its shadow dims the towers at one third, quickening as
-    // it is hurt.
+    // How far it still has to walk, in a straight line to the door.
+    this.distanceToDoor = Math.hypot(DOOR.x - this.x, DOOR.y - this.y);
+    // Capture state: 'free' walks, 'caught' hangs in the beam,
+    // 'resistant' just escaped and cannot be caught again yet.
+    this.state = 'free';
+    this.inConeTime = 0; // seconds spent inside the beam while gathering
+    this.caughtAt = null; // { x, y } where it was caught — it returns there
+    this.caughtUntil = 0; // game clock; it breaks free when now passes this
+    this.resistUntil = 0; // game clock; it cannot be caught while now is under this
+    this.slot = -1; // which slot of the beam it hangs in, while caught
+    // The Dread Moth alone has shell segments: one per furnace. A
+    // furnace whose segment is broken cannot break another.
     this.mothPhase = 0;
     this.dead = false;
     this.leaked = false;
+    this.burned = false; // destroyed in a furnace
     this.wobble = Math.random() * Math.PI * 2; // per-creature animation phase
   }
 
-  // True while the creature is marked by a Tide Bell.
-  isMarked(now) {
-    return now < this.markedUntil;
+  isFree(now) {
+    return this.state === 'free' && now >= this.resistUntil;
   }
 
-  // Current speed, slowed or not. The slowest active slow wins: a
-  // lantern's chill is stronger than the blaze, so it takes precedence
-  // while both are on, and the two never multiply each other.
-  currentSpeed(now) {
-    let factor = 1;
-    if (now < this.slowUntil) factor = Math.min(factor, this.slowFactor);
-    if (now < this.flareUntil) factor = Math.min(factor, BEACON.slowFactor);
-    return this.speed * factor;
+  isCaught() {
+    return this.state === 'caught';
   }
 
-  chill(factor, seconds, now) {
-    this.slowFactor = Math.min(this.slowFactor, factor);
-    this.slowUntil = Math.max(this.slowUntil, now + seconds);
+  // Catch it: it stops walking and hangs in the beam at its slot,
+  // struggling until its escape time runs out.
+  catch(slot, now) {
+    this.state = 'caught';
+    this.slot = slot;
+    this.caughtAt = { x: this.x, y: this.y };
+    const escape = this.type === 'wraith' ? NET.wraithEscapeTime : NET.escapeTime;
+    this.caughtUntil = now + escape;
+    this.inConeTime = 0;
   }
 
-  takeDamage(amount) {
-    this.hp -= amount;
-    if (this.hp <= 0) this.dead = true;
+  // Free it where it was caught: its journey is not reset, and not
+  // advanced either. It walks on from there, briefly uncatchable.
+  release(now) {
+    if (this.caughtAt) {
+      this.x = this.caughtAt.x;
+      this.y = this.caughtAt.y;
+    }
+    this.state = 'free';
+    this.slot = -1;
+    this.caughtAt = null;
+    this.resistUntil = now + NET.resistTime;
+    this.inConeTime = 0;
   }
 
   update(dt, now) {
-    if (this.dead || this.leaked) return;
-    if (this.regen > 0 && this.hp < this.maxHp) {
-      this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
+    if (this.dead || this.leaked || this.burned) return;
+    if (this.state === 'caught') return; // held still in the light
+    const dx = DOOR.x - this.x;
+    const dy = DOOR.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= this.speed * dt) {
+      this.x = DOOR.x;
+      this.y = DOOR.y;
+      this.leaked = true;
+      return;
     }
-    if (this.slowUntil && now >= this.slowUntil) this.slowFactor = 1;
-    const speed = this.currentSpeed(now);
-    let move = speed * dt;
-    while (move > 0 && !this.leaked) {
-      const target = WAYPOINTS[this.waypoint];
-      if (!target) {
-        this.leaked = true;
-        break;
-      }
-      const dx = target.x - this.x;
-      const dy = target.y - this.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= move) {
-        this.x = target.x;
-        this.y = target.y;
-        this.distance += dist;
-        move -= dist;
-        this.waypoint += 1;
-        if (this.waypoint >= WAYPOINTS.length) this.leaked = true;
-      } else {
-        this.x += (dx / dist) * move;
-        this.y += (dy / dist) * move;
-        this.distance += move;
-        move = 0;
-      }
-    }
+    this.x += (dx / dist) * this.speed * dt;
+    this.y += (dy / dist) * this.speed * dt;
+    this.distanceToDoor = Math.hypot(DOOR.x - this.x, DOOR.y - this.y);
   }
 
   // Which board cell the creature is standing in right now (the
-  // Beacon's blaze and the screenshots read this, not raw pixels).
+  // screenshots read this, not raw pixels).
   get col() {
     return Math.floor(this.x / BOARD.cell);
   }
@@ -124,8 +109,11 @@ export class Enemy {
     return Math.floor(this.y / BOARD.cell);
   }
 
-  // Fraction of health left, for the little bar above the creature.
-  hpFraction() {
-    return Math.max(0, this.hp / this.maxHp);
+  // Fraction of its escape time still left, for the little ring that
+  // shows how close a caught creature is to breaking free.
+  escapeFraction(now) {
+    if (this.state !== 'caught') return 0;
+    const total = this.type === 'wraith' ? NET.wraithEscapeTime : NET.escapeTime;
+    return Math.max(0, (this.caughtUntil - now) / total);
   }
 }

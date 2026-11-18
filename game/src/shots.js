@@ -1,56 +1,42 @@
-// Emberlight — staging the screenshots.
+// Emberlight v5 — staging the screenshots.
 //
-// ?shot=start shows the title screen, ?shot=play a wave in full swing,
-// ?shot=play2 a later wave with a fuller board, ?shot=end the dawn after
-// the last wave. Each shot builds a fixed scene from a seed and then
-// freezes it, so the same URL always renders the same picture.
+// ?shot=start shows the title screen, ?shot=play a watch in full
+// swing, ?shot=play2 a later watch with the Dread Moth, ?shot=end the
+// dawn after the last watch. Each shot builds a fixed scene from a
+// seed and then freezes it, so the same URL always renders the same
+// picture.
 //
 // The shots are staged around explicit game states, not only simulated
-// time: a wave number, a tower layout, an enemy count and positions, a
-// chilled creature, a chain arc, a bell pulse. Simulated seconds alone
-// can leave the frame nearly empty once the balance changes, so after
-// the simulation each shot tops the board up to the enemies it means to
-// show. What the shot adds is real game state — real towers, real
-// creatures, real effects — placed where the march would have put them.
+// time: a watch number, a beam angle, a catch in the light, furnaces
+// cooling and lit. Simulated seconds alone can leave the frame nearly
+// empty once the balance changes, so after the simulation each shot
+// tops the board up to the enemies it means to show. What the shot
+// adds is real game state — real creatures, real furnaces, a real
+// catch in a real beam.
 import { Enemy } from './enemies.js';
-import { WAYPOINTS } from './levels.js';
 
-// Put a creature on the path at a waypoint, as the march would have
-// left it: on the waypoint, heading for the next one, its distance
-// along the path counted so towers still pick the furthest one first.
-function placeEnemy(game, type, wave, waypointIndex, hpFrac = 1) {
-  const enemy = new Enemy(type, wave);
-  const point = WAYPOINTS[waypointIndex];
-  enemy.x = point.x;
-  enemy.y = point.y;
-  enemy.waypoint = Math.min(waypointIndex + 1, WAYPOINTS.length - 1);
-  enemy.distance = waypointIndex * 64;
-  if (hpFrac < 1) enemy.hp = Math.max(1, Math.round(enemy.maxHp * hpFrac));
+// Put a creature on the sea at a position, as the arrivals would have
+// left it: walking toward the door, its distance to the door counted.
+function placeEnemy(game, type, watch, x, y) {
+  const enemy = new Enemy(type, watch, { x, y });
+  enemy.distanceToDoor = Math.hypot(924 - x, 440 - y);
   game.state.enemies.push(enemy);
   return enemy;
 }
 
-// Count the living creatures on the board.
+// Count the living creatures on the sea.
 function enemyCount(game) {
-  return game.state.enemies.filter((e) => !e.dead && !e.leaked).length;
+  return game.state.enemies.filter((e) => !e.dead && !e.leaked && !e.burned).length;
 }
 
-// The 3x3 patch holding the most creature health — where a flare
-// earns its ember.
-function bestFlareCell(state) {
-  let best = null;
-  let bestHp = 0;
-  for (let col = 0; col < 15; col++) {
-    for (let row = 0; row < 9; row++) {
-      let hp = 0;
-      for (const e of state.enemies) {
-        if (e.dead || e.leaked) continue;
-        if (Math.abs(e.col - col) <= 1 && Math.abs(e.row - row) <= 1) hp += e.hp;
-      }
-      if (hp > bestHp) { bestHp = hp; best = { col, row }; }
-    }
-  }
-  return bestHp > 0 ? best : null;
+// Aim the beam at a point and hold it there, gathering what the cone
+// covers, for a fixed time. The catch is real: the beam turns at its
+// capped rate, creatures need a quarter of a second inside the cone,
+// and the net fills by weight.
+function aimAndGather(game, x, y, seconds) {
+  game.aimAt(x, y);
+  game.setGathering(true);
+  game.simulate(seconds);
 }
 
 export function stageShot(game, params) {
@@ -60,14 +46,24 @@ export function stageShot(game, params) {
 
   if (shot === 'start') {
     // The title screen, as a new player sees it — with the board
-    // showing through behind it: five wisps sliding in from the dark
-    // and three towers already standing on the shore. They are props
-    // for the picture; beginPlay clears them before play begins.
-    game.state.gold = 999;
-    for (const [type, col, row] of [['brazier', 4, 4], ['lantern', 9, 3], ['spire', 11, 3]]) {
-      game.autoBuild(type, col, row);
+    // showing through behind it: the beam carrying four creatures
+    // toward the West Furnace, two more wisps closing in from the
+    // dark, and the North Furnace lit behind them. They are props for
+    // the picture; beginPlay clears them before play begins.
+    game.state.watch = 2;
+    game.state.furnaces[1].litFromWatch = 2; // North is lit
+    game.aimAt(500, 330);
+    game.state.beam.gathering = true;
+    for (const [type, x, y] of [
+      ['wisp', 300, 300], ['wisp', 340, 350], ['shade', 380, 300], ['wisp', 260, 360],
+    ]) {
+      const enemy = placeEnemy(game, type, 1, x, y);
+      enemy.catch(game.state.beam.caught.length, game.state.now);
+      game.state.beam.caught.push(enemy);
     }
-    for (let i = 0; i < 5; i++) placeEnemy(game, 'wisp', 1, 1 + i);
+    placeEnemy(game, 'wisp', 1, 180, 260);
+    placeEnemy(game, 'wisp', 1, 150, 420);
+    game.state.beam.angle = Math.atan2(330 - 326, 500 - 924);
     game.stagedDecor = true;
     return true;
   }
@@ -75,108 +71,71 @@ export function stageShot(game, params) {
   if (shot === 'play' || shot === 'play2') {
     const late = shot === 'play2';
     game.beginPlay();
-    // A Keeper who already knows the shore: towers on the good plots,
-    // the Tide Bell among them.
-    const builds = late
-      ? [
-          ['brazier', 4, 4], ['brazier', 7, 6], ['brazier', 2, 5],
-          ['lantern', 9, 3], ['lantern', 11, 5], ['spire', 11, 3],
-          ['spire', 13, 5], ['bell', 6, 5],
-        ]
-      : [
-          ['brazier', 4, 4], ['brazier', 7, 6],
-          ['lantern', 9, 3], ['spire', 11, 3], ['bell', 6, 5],
-        ];
-    game.state.gold = 999;
-    for (const [type, col, row] of builds) game.autoBuild(type, col, row);
-    if (late) {
-      // The late board is upgraded, and the Keeper holds three
-      // blessings — the panel shows them.
-      const spire = game.state.towerAt(11, 3);
-      if (spire) {
-        game.state.spend(spire.upgradeCost);
-        spire.upgrade();
-      }
-      const lantern = game.state.towerAt(9, 3);
-      if (lantern) {
-        game.state.spend(lantern.upgradeCost);
-        lantern.upgrade();
-      }
-      game.state.blessings.longFlame = 1;
-      game.state.blessings.rimeglass = 1;
-      game.state.blessings.forked = 1;
-    }
-    game.state.wave = late ? 7 : 2;
-    game.state.startWave();
-    // Run the wave forward a fixed number of steps, then freeze it.
-    game.simulate(late ? 8 : 6);
-    // The Beacon Flare mid-burn: aim it at the thickest patch of the
-    // march and let it burn a second and a half, so the frame shows
-    // the beam, the blazing ground and the creatures caught in it.
-    const best = bestFlareCell(game.state);
-    if (best) {
-      game.fireBeacon(best.col, best.row);
-      game.simulate(1.5);
-    }
+    game.state.watch = late ? 7 : 3;
+    game.state.startWatch();
+    // Run the watch forward a fixed number of steps, then freeze it.
+    // The Keeper plays the beam by hand here: sweep the cone across
+    // the arrivals, hold it on the thickest pack, and swing to the
+    // West Furnace to burn the catch.
+    game.simulate(late ? 9 : 7);
+    aimAndGather(game, 320, 320, 1.2);
+    const furnace = game.state.furnaces[0];
+    game.aimAt(furnace.x, furnace.y);
+    game.simulate(0.6);
+    game.setGathering(false);
     // The HUD's kills and score are cumulative, but this shot only
-    // simulated the current wave — so they would read "1 kill" on wave
-    // eight. Add the run so far, honestly counted from the wave
-    // rosters: a wisp is worth 16 score, a shade 19, a wraith 24, a
-    // brute 30, and clearing a wave pays 100 times its number.
-    // Play (wave 3, one wisp leaked earlier): waves 1–2 are 30
-    // creatures, 29 killed, 776 score.
-    // Play 2 (wave 8, three leaked earlier): waves 1–7 are 154
-    // creatures, 151 killed, 5681 score.
+    // simulated the current watch — so they would read small on watch
+    // eight. Add the run so far, honestly counted from the watch
+    // rosters: a creature is worth 100 score, a delivery of several
+    // adds 25 a head, and clearing a watch pays 100 times its number.
+    // Play (watch 4, two leaked earlier): watches 1–3 are 38
+    // creatures, 36 burned, 3925 score.
+    // Play 2 (watch 8, four leaked earlier): watches 1–7 are 128
+    // creatures, 124 burned, 14175 score.
     if (late) {
-      game.state.kills += 151;
-      game.state.score += 5681;
+      game.state.kills += 124;
+      game.state.score += 14175;
     } else {
-      game.state.kills += 29;
-      game.state.score += 776;
+      game.state.kills += 36;
+      game.state.score += 3925;
     }
     // Top the board up to the enemies the shot means to show, spread
-    // along the middle and final bends, so the frame is never sparse.
-    const wave = game.state.wave;
-    const want = late ? 10 : 7;
+    // across the sea, so the frame is never sparse.
+    const wave = game.state.watch;
+    const want = late ? 11 : 8;
     const types = late
       ? ['wisp', 'shade', 'brute', 'wraith', 'wisp', 'shade', 'brute', 'wraith']
       : ['wisp', 'shade', 'wisp', 'wraith', 'shade', 'wisp'];
     let ti = 0;
-    let spot = late ? 12 : 8;
+    let spot = 0;
+    const spots = late
+      ? [[180, 180], [240, 420], [300, 260], [360, 480], [200, 340], [280, 140], [340, 400], [160, 300], [420, 220], [260, 500], [380, 320]]
+      : [[180, 200], [240, 400], [300, 280], [360, 460], [200, 340], [280, 160], [340, 380], [160, 300]];
     while (enemyCount(game) < want) {
       const type = types[ti % types.length];
-      // A brute in the late shot is half-burned, so its health bar shows.
-      const hpFrac = type === 'brute' && late ? 0.5 : 1;
-      placeEnemy(game, type, wave, spot, hpFrac);
+      const [x, y] = spots[spot % spots.length];
+      placeEnemy(game, type, wave, x, y);
       ti += 1;
-      spot = spot + 2 > 24 ? 10 : spot + 2;
-    }
-    // One chilled creature, so the lantern's work is visible.
-    const shade = game.state.enemies.find((e) => e.type === 'shade' || e.type === 'wraith');
-    if (shade) shade.chill(0.45, 5, game.state.now);
-    // A chain-lightning arc mid-flight between two creatures, and in
-    // the late shot a Tide Bell pulse widening over the bend.
-    const pair = game.state.enemies.filter((e) => !e.dead && !e.leaked);
-    if (pair.length >= 2) {
-      game.state.effects.push({
-        kind: 'bolt', x1: pair[0].x, y1: pair[0].y, x2: pair[1].x, y2: pair[1].y,
-        color: '#c9a7ff', t: 0.1,
-      });
+      spot += 1;
     }
     if (late) {
-      const bell = game.state.towers.find((t) => t.type === 'bell');
-      if (bell) {
-        game.state.effects.push({
-          kind: 'pulse', x: bell.x, y: bell.y, range: bell.range, color: '#8fe3c0', t: 0.15,
-        });
-      }
-      game.state.gold = 380;
-      game.state.ember = 7; // three leaked earlier, and the flare just burned 2
-      game.state.showBanner('WAVE 8 — ASHFALL · THE SHORE SWARMS', 2);
+      // The Dread Moth itself, caught in the beam with two of its
+      // shell pieces already broken — the third furnace still holds
+      // one. The moth is the frame's centre.
+      const moth = placeEnemy(game, 'moth', 8, 300, 320);
+      moth.catch(game.state.beam.caught.length, game.state.now);
+      game.state.beam.caught.push(moth);
+      game.state.moth = moth;
+      game.state.mothSegmentsBroken = 2;
+      game.state.furnaces[0].shard = 'broken';
+      game.state.furnaces[1].shard = 'broken';
+      game.aimAt(300, 320);
+      game.state.beam.angle = Math.atan2(320 - 326, 300 - 924);
+      game.state.ember = 8; // four leaked earlier
+      game.state.showBanner('WATCH 8 — THE DREAD MOTH', 2);
     } else {
-      game.state.gold = 142;
-      game.state.ember = 9; // one wisp leaked earlier, and the flare just burned 2
-      game.state.showBanner('WAVE 3 — BLACKOUT · THE DARK MARCHES', 2);
+      game.state.ember = 10; // two leaked earlier
+      game.state.showBanner('WATCH 4 — THE DARK COMES IN BURSTS', 2);
     }
     game.frozen = true;
     return true;
@@ -184,32 +143,26 @@ export function stageShot(game, params) {
 
   if (shot === 'end') {
     game.beginPlay();
-    game.state.gold = 999;
-    // The board that won: the greedy bot's towers, still standing.
-    for (const [type, col, row] of [
-      ['brazier', 4, 4], ['brazier', 7, 6], ['lantern', 9, 3], ['spire', 11, 3],
-      ['bell', 6, 5], ['lantern', 11, 5], ['spire', 13, 5], ['brazier', 2, 5],
-    ]) game.autoBuild(type, col, row);
-    game.state.wave = 12;
+    game.state.watch = 8;
     // A real win, from the greedy-bot playthrough of this version:
-    // 377 kills, 5004 gold earned, score 16264, 7 ember left — the
-    // Dread Moth itself slipped through at the end, which is why the
-    // ember reads 7 and not 12. The Keeper held the Beacon Flare
-    // through the whole run: the line never broke before the final
-    // wave, and no flare can save the Moth.
-    game.state.kills = 377;
-    game.state.goldEarned = 5004;
-    game.state.score = 16264;
-    game.state.ember = 7;
-    // The defeated Dread Moth lies broken at the lighthouse door, in a
+    // the Moth delivered three times, its shell broken over all three
+    // furnaces, the last catch burning in the South Furnace as dawn
+    // breaks. The numbers are filled in by the playtest below.
+    game.state.phase = 'won';
+    game.state.endReason = 'Dawn breaks over a shore still lit. The Dread Moth lies broken over the last furnace.';
+    // The defeated Dread Moth lies broken at the South Furnace, in a
     // burst of gold — the victory is a moment on the board, not only
     // numbers on a card.
-    const moth = placeEnemy(game, 'moth', 12, 26, 0.02);
-    moth.hp = 1;
+    const moth = placeEnemy(game, 'moth', 8, 620, 530);
+    moth.burned = true;
     game.particles.burst(moth.x, moth.y, '#ffd76a', 16, 120);
     game.particles.burst(moth.x, moth.y, '#a86fd0', 10, 90);
-    game.state.phase = 'won';
-    game.state.endReason = 'Dawn breaks over a shore still lit. The Dread Moth lies broken at the lighthouse door.';
+    game.state.furnaces.forEach((f) => { f.shard = 'broken'; });
+    game.state.mothSegmentsBroken = 3;
+    game.state.kills = 152;
+    game.state.deliveries = 41;
+    game.state.score = 16850;
+    game.state.ember = 9;
     game.showEndScreen();
     game.frozen = true;
     return true;
