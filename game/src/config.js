@@ -94,9 +94,32 @@ export const TOWERS = {
     blurb: 'A crystal that calls the storm down.',
     detail: 'Slow, heavy bolts that leap between foes.',
   },
+  // The Tide Bell fires no shot. Every few seconds it rings, and every
+  // creature its sound reaches is marked: the next tower hit on a marked
+  // creature lands much harder. It is the answer to brutes and the boss,
+  // and nearly useless against wisps that die to one flame anyway.
+  bell: {
+    id: 'bell',
+    name: 'Tide Bell',
+    key: '4',
+    cost: 90,
+    damage: 0,
+    rate: 0,
+    range: 150,
+    projectileSpeed: 0,
+    pulseInterval: 3.2, // seconds between rings
+    markSeconds: 1.2, // how long a mark lasts
+    markBonus: 15, // extra damage on the next hit on a marked creature
+    color: '#8fe3c0',
+    glow: '#2fae7d',
+    glowInner: '#2fae7d66',
+    glowOuter: '#2fae7d18',
+    blurb: 'A bell that marks the dark for death.',
+    detail: 'Rings every 3.2s. Marked foes take +15 on the next hit.',
+  },
 };
 
-export const TOWER_ORDER = ['brazier', 'lantern', 'spire'];
+export const TOWER_ORDER = ['brazier', 'lantern', 'spire', 'bell'];
 
 // The creatures that crawl out of the dark. hp scales with the wave;
 // speed is pixels per second; leak is how much ember a creature costs
@@ -151,7 +174,7 @@ export const ENEMIES = {
     id: 'moth',
     name: 'Dread Moth',
     hp: 2400,
-    speed: 20,
+    speed: 24,
     reward: 150,
     leak: 5,
     radius: 30,
@@ -180,9 +203,9 @@ export const WAVES = [
   { shade: 14, wraith: 10, brute: 4 },
   { wisp: 20, brute: 8, wraith: 8 },
   { shade: 18, brute: 8, wraith: 12 },
-  { brute: 14, wraith: 14, shade: 10 },
-  { brute: 14, wraith: 18, shade: 14, wisp: 20 },
-  { moth: 1, brute: 10, wraith: 12 },
+  { brute: 16, wraith: 16, shade: 10 },
+  { brute: 18, wraith: 22, shade: 14, wisp: 20 },
+  { moth: 1, brute: 14, wraith: 16 },
 ];
 
 export const TOTAL_WAVES = WAVES.length;

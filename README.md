@@ -4,12 +4,13 @@
 [![rank](https://make.fun/badge/best-game-01/7SteveJohn/best-game-01/rank.svg)](https://make.fun/bounty/best-game-01)
 [![reward](https://make.fun/badge/best-game-01/7SteveJohn/best-game-01/reward.svg)](https://make.fun/bounty/best-game-01)
 
-A tower-defense game for the [make.fun best-game-01](https://make.fun/bounty/best-game-01) bounty. Night has swallowed the shore, and the dark is crawling toward the last ember. You are the Keeper of the lighthouse: raise braziers, lanterns and storm spires along the shore path, burn the creatures down before they reach the flame, and hold the light through all twelve waves — the last one brings the Dread Moth.
+A tower-defense game for the [make.fun best-game-01](https://make.fun/bounty/best-game-01) bounty. Night has swallowed the shore, and the dark is crawling toward the last ember. You are the Keeper of the lighthouse: raise braziers, lanterns, storm spires and tide bells along the shore path, choose the ember's blessings between waves, burn the creatures down before they reach the flame, and hold the light through all twelve waves — the last one brings the Dread Moth, which splits at two thirds of its health and dims your towers at one third.
 
 ## How to play
 
-- **Pick a tower** with keys `1`/`2`/`3` or by clicking its card, then **click a plot** to build it.
-- **Ember Brazier** (50 gold): cheap, fast, short reach. **Frost Lantern** (75 gold): chills what it hits, halving its speed. **Storm Spire** (110 gold): slow, heavy bolts that leap between foes.
+- **Pick a tower** with keys `1`/`2`/`3`/`4` or by clicking its card, then **click a plot** to build it.
+- **Ember Brazier** (50 gold): cheap, fast, short reach. **Frost Lantern** (75 gold): chills what it hits, halving its speed. **Storm Spire** (110 gold): slow, heavy bolts that leap between foes. **Tide Bell** (90 gold): rings every 3.2s and marks foes in reach — the next hit on a marked creature lands +15.
+- **After each cleared wave, the ember offers a blessing** — pick one of three (keys `1`/`2`/`3` or click). Long Flame stretches braziers, Rimeglass lengthens the chill, Forked Conduit strengthens the spire's leaps, Keeper's Due pays more gold per wave. Blessings last the whole run and stack up to twice each.
 - **Click a tower** on the board to upgrade it (up to level 3) or sell it back for 70%.
 - **Space** (or the button) starts the next wave. Clearing a wave pays a bonus.
 - **P** pause, **F** double speed, **M** mute, **R** restart on the end screen.
@@ -31,7 +32,8 @@ Then open http://localhost:8080 in desktop Chrome. No build step, no network: th
 - `game/src/config.js` — board, towers, creatures, waves, palette
 - `game/src/levels.js` — the shore path and wave queues
 - `game/src/enemies.js` — the creatures that walk the path
-- `game/src/towers.js` — the three towers and their shots
+- `game/src/towers.js` — the four towers and their shots; the Tide Bell marks
+- `game/src/blessings.js` — the Ember Blessings offered between waves
 - `game/src/render.js` — everything the eye sees
 - `game/src/particles.js` — sparks, smoke, floating numbers, shake
 - `game/src/audio.js` — synthesized sound effects and wind

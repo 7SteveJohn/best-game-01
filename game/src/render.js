@@ -322,6 +322,27 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(x + sway, y - 18, 3.5, 0, Math.PI * 2);
       ctx.fill();
+    } else if (tower.type === 'bell') {
+      // Tide Bell: a post with a hanging bell that swings as it rings.
+      ctx.strokeStyle = '#3a3f52';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 14);
+      ctx.lineTo(x, y - 12);
+      ctx.stroke();
+      const swing = Math.sin(now * 2.2 + tower.col) * 2;
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      ctx.moveTo(x + swing - 9, y - 8);
+      ctx.lineTo(x + swing + 9, y - 8);
+      ctx.lineTo(x + swing + 5, y - 20);
+      ctx.lineTo(x + swing - 5, y - 20);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#eafff5';
+      ctx.beginPath();
+      ctx.arc(x + swing, y - 6, 2.5, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // Storm spire: a crystal that hums, drawn pointing at its target.
       ctx.save();
@@ -459,6 +480,23 @@ export class Renderer {
       ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2);
       ctx.stroke();
     }
+    // A Tide Bell's mark: a gold diamond over the creature, so the
+    // player can see which foe the next hit will land harder on.
+    if (enemy.isMarked(now)) {
+      ctx.fillStyle = '#ffd76a';
+      ctx.beginPath();
+      ctx.moveTo(0, -enemy.radius - 14);
+      ctx.lineTo(5, -enemy.radius - 8);
+      ctx.lineTo(0, -enemy.radius - 2);
+      ctx.lineTo(-5, -enemy.radius - 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 215, 106, 0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
 
     // Health bar, only when hurt.
@@ -520,6 +558,41 @@ export class Renderer {
         ctx.moveTo(e.x1, e.y1);
         ctx.lineTo(midX, midY);
         ctx.lineTo(e.x2, e.y2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (e.kind === 'pulse') {
+        // A Tide Bell's ring, widening as it fades.
+        ctx.strokeStyle = e.color;
+        ctx.globalAlpha = a * 0.8;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 10 + (1 - a) * (e.range || 150), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (e.kind === 'mark') {
+        // The gold burst when a mark is spent by a hit.
+        ctx.fillStyle = '#ffd76a';
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 4 + (1 - a) * 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (e.kind === 'split') {
+        // The Dread Moth splitting: a purple burst where the wisps are born.
+        ctx.strokeStyle = e.color;
+        ctx.globalAlpha = a;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 8 + (1 - a) * 46, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (e.kind === 'shadow') {
+        // The Moth's shadow falling: a dark ring closing in.
+        ctx.strokeStyle = 'rgba(61, 43, 82, 0.9)';
+        ctx.globalAlpha = a;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 90 - (1 - a) * 50, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }

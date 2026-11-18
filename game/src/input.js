@@ -56,8 +56,11 @@ export class Input {
       if (event.key !== ' ') return;
     }
     const key = event.key.toLowerCase();
-    if (key === '1' || key === '2' || key === '3') {
-      this.handlers.onPickType(['brazier', 'lantern', 'spire'][Number(key) - 1]);
+    if (key === '1' || key === '2' || key === '3' || key === '4') {
+      // Number keys pick a tower — or, while a blessing waits, the
+      // blessing in that place. The game decides which; input only
+      // reports the place.
+      this.handlers.onPickIndex(Number(key) - 1);
     } else if (key === ' ') {
       event.preventDefault();
       this.handlers.onStartWave();

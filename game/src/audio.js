@@ -136,6 +136,18 @@ export class SoundBank {
     this.tone({ type: 'sawtooth', from: 320, to: 90, seconds: 0.16, volume: 0.1 });
   }
 
+  // The Tide Bell's ring: a low chime with a long tail.
+  bell() {
+    this.tone({ type: 'sine', from: 392, seconds: 0.5, volume: 0.14 });
+    this.tone({ type: 'sine', from: 587, seconds: 0.4, volume: 0.08, delay: 0.02 });
+  }
+
+  // Choosing a blessing: a warm rising pair.
+  blessing() {
+    this.tone({ type: 'sine', from: 659, seconds: 0.14, volume: 0.14 });
+    this.tone({ type: 'sine', from: 988, seconds: 0.22, volume: 0.14, delay: 0.1 });
+  }
+
   kill() {
     this.tone({ type: 'sine', from: 1320, to: 1760, seconds: 0.08, volume: 0.07 });
   }

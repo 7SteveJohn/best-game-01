@@ -6,7 +6,7 @@
 import { TOWERS, ECONOMY } from './config.js';
 
 export class Tower {
-  constructor(type, col, row) {
+  constructor(type, col, row, mods = null) {
     const def = TOWERS[type];
     this.type = type;
     this.def = def;
@@ -19,6 +19,15 @@ export class Tower {
     this.cooldown = 0;
     this.angle = -Math.PI / 2; // where its flame points
     this.flash = 0; // muzzle-flash timer, for the render
+    // The Keeper's blessings, shared with the state: they shape what
+    // this tower can do. A tower built before a blessing is chosen still
+    // gains from it, because this is the same object, not a copy.
+    this.mods = mods;
+    // The Dread Moth's shadow can dim this tower for a while.
+    this.dimUntil = 0; // game clock; dimmed while now < dimUntil
+    this.dimFactor = 1;
+    // The Tide Bell rings on this clock instead of firing.
+    this.pulseClock = 0;
   }
 
   get damage() {
@@ -26,7 +35,23 @@ export class Tower {
   }
 
   get range() {
-    return this.def.range * (1 + ECONOMY.upgradeRangeFactor * (this.level - 1));
+    let range = this.def.range * (1 + ECONOMY.upgradeRangeFactor * (this.level - 1));
+    // A Long Flame blessing stretches every brazier's reach.
+    if (this.type === 'brazier' && this.mods) range += 15 * (this.mods.longFlame || 0);
+    // The Dread Moth's shadow shrinks this tower's reach for a while.
+    if (this.now !== undefined && this.now < this.dimUntil) range *= this.dimFactor;
+    return range;
+  }
+
+  // How long a lantern's chill holds, with the Rimeglass blessing.
+  get slowSeconds() {
+    return (this.def.slowSeconds || 0) + 0.5 * ((this.mods && this.mods.rimeglass) || 0);
+  }
+
+  // How much strength a spire's bolt keeps per leap, with the Forked
+  // Conduit blessing; never more than nearly all of it.
+  get chainFalloff() {
+    return Math.min(0.9, (this.def.chainFalloff || 0) + 0.1 * ((this.mods && this.mods.forked) || 0));
   }
 
   get rate() {
@@ -69,9 +94,14 @@ export class Tower {
     return best;
   }
 
-  update(dt, enemies, projectiles, onShoot) {
+  update(dt, enemies, projectiles, onShoot, effects, now) {
+    this.now = now;
     this.cooldown -= dt;
     this.flash = Math.max(0, this.flash - dt);
+    if (this.type === 'bell') {
+      this.ring(dt, enemies, effects, now, onShoot);
+      return;
+    }
     const target = this.acquire(enemies);
     if (!target) return;
     this.angle = Math.atan2(target.y - this.y, target.x - this.x);
@@ -80,6 +110,29 @@ export class Tower {
     this.flash = 0.09;
     projectiles.push(new Projectile(this, target));
     onShoot(this);
+  }
+
+  // The Tide Bell rings instead of firing: every creature in reach is
+  // marked for a short while, and the next tower hit on each of them
+  // lands much harder. The ring itself is an effect the renderer draws.
+  ring(dt, enemies, effects, now, onShoot) {
+    this.pulseClock -= dt;
+    if (this.pulseClock > 0) return;
+    this.pulseClock = this.def.pulseInterval;
+    let marked = 0;
+    for (const enemy of enemies) {
+      if (enemy.dead || enemy.leaked) continue;
+      const d = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+      if (d <= this.range) {
+        enemy.markedUntil = now + this.def.markSeconds;
+        enemy.markBonus = this.def.markBonus;
+        marked += 1;
+      }
+    }
+    if (marked > 0) {
+      effects.push({ kind: 'pulse', x: this.x, y: this.y, range: this.range, color: this.def.color, t: 0 });
+      onShoot(this);
+    }
   }
 }
 
@@ -121,19 +174,26 @@ export class Projectile {
   hit(target, enemies, effects, now) {
     const tower = this.tower;
     const def = tower.def;
-    target.takeDamage(tower.damage);
+    // A Tide Bell's mark is spent by the next hit on the creature.
+    let damage = tower.damage;
+    if (target.isMarked(now)) {
+      damage += target.markBonus;
+      target.markedUntil = 0;
+      effects.push({ kind: 'mark', x: target.x, y: target.y, color: '#ffd76a', t: 0 });
+    }
+    target.takeDamage(damage);
     effects.push({ kind: 'hit', x: target.x, y: target.y, color: def.color, t: 0 });
     if (def.id === 'lantern') {
-      target.chill(def.slowFactor, def.slowSeconds, now);
+      target.chill(def.slowFactor, tower.slowSeconds, now);
       effects.push({ kind: 'chill', x: target.x, y: target.y, color: def.color, t: 0 });
     }
     if (def.id === 'spire') {
       // The bolt leaps to the nearest other creatures, weakening each jump.
       let from = target;
-      let damage = tower.damage;
+      let jumpDamage = damage;
       const jumped = new Set([target.id]);
       for (let jump = 0; jump < def.chainTargets; jump++) {
-        damage = Math.round(damage * def.chainFalloff);
+        jumpDamage = Math.round(jumpDamage * tower.chainFalloff);
         let nearest = null;
         let nearestDist = 130;
         for (const enemy of enemies) {
@@ -145,7 +205,7 @@ export class Projectile {
           }
         }
         if (!nearest) break;
-        nearest.takeDamage(damage);
+        nearest.takeDamage(jumpDamage);
         effects.push({
           kind: 'bolt', x1: from.x, y1: from.y, x2: nearest.x, y2: nearest.y,
           color: def.color, t: 0,

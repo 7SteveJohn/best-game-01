@@ -34,13 +34,12 @@
         <h1>Emberlight</h1>
         <p class="tagline">The Last Lighthouse</p>
         <p class="story">
-          Night has swallowed the shore, and the dark is crawling toward the
-          last ember. You are the Keeper. Raise braziers, lanterns and storm
-          spires along the shore path, burn the creatures down before they
-          reach the lighthouse — and hold the light through all twelve waves.
+          Night has swallowed the shore. You are the Keeper — raise your
+          towers along the path, choose the ember's blessings between
+          waves, and hold the last light through all twelve nights.
         </p>
         <div class="how">
-          <span><b>1 / 2 / 3</b> pick a tower</span>
+          <span><b>1 / 2 / 3 / 4</b> pick a tower</span>
           <span><b>Click</b> a plot to build it</span>
           <span><b>Click</b> a tower to upgrade or sell</span>
           <span><b>Space</b> start the next wave</span>
@@ -48,6 +47,13 @@
         </div>
         <button id="btn-start" class="big">Light the First Flame</button>
         <p class="foot">Twelve waves. One ember. No dawn until the last wisp burns.</p>
+      </div>
+
+      <div id="blessing-screen" class="overlay hidden">
+        <h1 id="blessing-title">The Ember Offers</h1>
+        <p id="blessing-wave" class="story">Wave 1 cleared — the ember offers a blessing</p>
+        <div id="blessing-cards" class="blessing-cards"></div>
+        <p class="foot">Choose one. It lasts the whole run — and it stacks, up to twice each.</p>
       </div>
 
       <div id="end-screen" class="overlay hidden">
@@ -68,18 +74,25 @@
       <h2>Next wave</h2>
       <p id="next-wave" class="hint strong">Next: Wave 1 — 12 Wisps</p>
       <p id="advice" class="advice"></p>
+      <h2>Ember blessings</h2>
+      <ul id="blessings" class="notes">
+        <li class="hint">None yet — clear a wave and the ember offers one.</li>
+      </ul>
       <h2>Keeper's notes</h2>
       <ul class="notes">
         <li>Creatures walk the shore path to the lighthouse. A leak costs ember.</li>
         <li>Frost Lanterns slow the march — put them where the path bends.</li>
         <li>Storm Spires hit hard and their bolts leap. Save them for brutes.</li>
+        <li>A Tide Bell marks foes — the next hit on a marked creature lands +15.</li>
+        <li>After each wave, the ember offers a blessing. Choose one; it lasts the run, up to twice each.</li>
+        <li>The Dread Moth splits at two thirds of its health, and its shadow dims the towers at one third.</li>
         <li>Clearing a wave pays a bonus. Spend it before the next horn.</li>
       </ul>
     </aside>
   </main>
 
   <footer id="keys">
-    Mouse builds and aims · 1/2/3 towers · Space next wave · P pause · F speed · M sound · R restart on the end screen
+    Mouse builds and aims · 1/2/3/4 towers · Space next wave · P pause · F speed · M sound · R restart on the end screen
   </footer>
 </div>
 <script type="module" src="./src/main.js"></script>

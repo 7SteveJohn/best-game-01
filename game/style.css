@@ -44,7 +44,9 @@ button:disabled { opacity: 0.45; cursor: default; }
   position: absolute; inset: 0; border-radius: 10px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: 30px 70px;
-  background: radial-gradient(ellipse at 50% 38%, rgba(13, 21, 49, 0.88), rgba(5, 7, 15, 0.94));
+  /* Translucent enough that the board shows through: the title and
+     victory shots must still read as a tower-defense game, not a poster. */
+  background: radial-gradient(ellipse at 50% 38%, rgba(13, 21, 49, 0.76), rgba(5, 7, 15, 0.88));
 }
 .overlay.hidden { display: none; }
 .overlay h1 {
@@ -66,6 +68,24 @@ button:disabled { opacity: 0.45; cursor: default; }
 .foot { font-size: 12px; color: #7c89ab; margin: 18px 0 0; font-style: italic; }
 .stats { display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: center; margin: 6px 0 22px; font-size: 15px; }
 .stats b { color: #ffd76a; font-size: 19px; }
+
+/* --- Blessing picker --- */
+#blessing-title { font-size: 40px; }
+.blessing-cards { display: flex; gap: 14px; margin: 6px 0 4px; }
+.blessing-card {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
+  width: 220px; text-align: left; padding: 14px 14px 12px; border-radius: 10px;
+  background: #141d38; border: 1px solid #ffb347; color: #e8ecf7; cursor: pointer;
+}
+.blessing-card:hover { background: #2a2113; box-shadow: 0 0 0 1px #ffb347; }
+.blessing-key {
+  grid-row: span 3; align-self: center; font-weight: 800; font-size: 17px;
+  color: #ffd76a; border: 1px solid #3a4f7d; border-radius: 6px; padding: 3px 7px;
+}
+.blessing-icon { font-size: 22px; }
+.blessing-name { font-weight: 700; font-size: 15px; color: #ffd76a; }
+.blessing-blurb { grid-column: 2 / 3; font-size: 13px; color: #e8ecf7; font-weight: 600; }
+.blessing-detail { grid-column: 2 / 3; font-size: 12px; color: #9aa7c7; line-height: 1.45; }
 
 /* --- Side panel --- */
 #panel {

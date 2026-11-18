@@ -9,7 +9,7 @@ import { WAYPOINTS } from './levels.js';
 let nextId = 1;
 
 export class Enemy {
-  constructor(type, wave) {
+  constructor(type, wave, at = null) {
     const def = ENEMIES[type];
     this.id = nextId++;
     this.type = type;
@@ -23,15 +23,37 @@ export class Enemy {
     this.color = def.color;
     this.core = def.core;
     this.regen = def.regen || 0;
-    this.x = WAYPOINTS[0].x;
-    this.y = WAYPOINTS[0].y;
-    this.waypoint = 1; // next waypoint to walk toward
+    // Where it starts: the western dark, unless the caller places it
+    // mid-path — the Dread Moth's split wisps are born where it stands.
+    if (at) {
+      this.x = at.x;
+      this.y = at.y;
+      this.waypoint = at.waypoint;
+      this.distance = at.distance || 0;
+    } else {
+      this.x = WAYPOINTS[0].x;
+      this.y = WAYPOINTS[0].y;
+      this.waypoint = 1; // next waypoint to walk toward
+      this.distance = 0; // how far along the path it has walked
+    }
     this.slowUntil = 0; // game clock; chilled while now < slowUntil
     this.slowFactor = 1;
+    // A Tide Bell's mark: the next tower hit on this creature lands
+    // harder, then the mark is spent.
+    this.markedUntil = 0;
+    this.markBonus = 0;
+    // The Dread Moth alone has phases: it splits at two thirds of its
+    // health and its shadow dims the towers at one third, quickening as
+    // it is hurt.
+    this.mothPhase = 0;
     this.dead = false;
     this.leaked = false;
     this.wobble = Math.random() * Math.PI * 2; // per-creature animation phase
-    this.distance = 0; // how far along the path it has walked
+  }
+
+  // True while the creature is marked by a Tide Bell.
+  isMarked(now) {
+    return now < this.markedUntil;
   }
 
   // Current speed, chilled or not.

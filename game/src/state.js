@@ -6,6 +6,7 @@
 import { ECONOMY, TOTAL_WAVES } from './config.js';
 import { Enemy } from './enemies.js';
 import { buildWaveQueue } from './levels.js';
+import { BLESSINGS, freshBlessings, drawBlessingOffer } from './blessings.js';
 
 // What the Keeper is told after a leak: one line per creature, naming
 // the fix instead of only the loss. The panel shows the latest one.
@@ -53,6 +54,11 @@ export class GameState {
     this.leaksByType = {}; // creature type -> how many reached the door
     this.advice = ''; // latest leak advice, shown in the side panel
     this.events = []; // kill/leak/wave events, drained by the loop for effects
+    // The Ember Blessings: what the Keeper has chosen, and the choice
+    // still open after the last cleared wave.
+    this.blessings = freshBlessings();
+    this.blessingOffer = null; // three blessing ids, or null
+    this.blessingPending = false;
   }
 
   get waveInProgress() {
@@ -74,6 +80,7 @@ export class GameState {
 
   startWave() {
     if (this.phase !== PHASES.BUILD) return false;
+    if (this.blessingPending) return false; // choose a blessing first
     if (this.wave >= TOTAL_WAVES) return false;
     this.wave += 1;
     this.phase = PHASES.WAVE;
@@ -107,9 +114,9 @@ export class GameState {
       }
     }
 
-    // Towers fire.
+    // Towers fire — and the Tide Bell rings.
     for (const tower of this.towers) {
-      tower.update(dt, this.enemies, this.projectiles, (t) => this.onTowerShot(t));
+      tower.update(dt, this.enemies, this.projectiles, (t) => this.onTowerShot(t), this.effects, this.now);
     }
 
     // Projectiles fly and land.
@@ -124,6 +131,12 @@ export class GameState {
     }
     this.enemies = this.enemies.filter((e) => !e.dead && !e.leaked);
 
+    // The Dread Moth's phases: it splits at two thirds of its health
+    // and its shadow dims the towers at one third.
+    for (const enemy of this.enemies) {
+      if (enemy.type === 'moth' && !enemy.dead) this.checkMothPhase(enemy);
+    }
+
     // Transient hit effects fade.
     for (const e of this.effects) e.t += dt;
     this.effects = this.effects.filter((e) => e.t < 0.35);
@@ -137,7 +150,46 @@ export class GameState {
   onTowerShot(tower) {
     if (tower.type === 'brazier') this.sounds.shootBrazier();
     else if (tower.type === 'lantern') this.sounds.shootLantern();
+    else if (tower.type === 'bell') this.sounds.bell();
     else this.sounds.shootSpire();
+  }
+
+  // The Dread Moth is not one long walk: at two thirds of its health it
+  // splits three wisps off itself and surges faster, and at one third it
+  // surges again and its shadow shrinks the reach of the two nearest
+  // towers. A moth that only ever walks is a big wisp; a moth that
+  // quickens as it is hurt is a boss the Keeper has to race.
+  checkMothPhase(moth) {
+    const frac = moth.hp / moth.maxHp;
+    if (moth.mothPhase === 0 && frac <= 2 / 3) {
+      moth.mothPhase = 1;
+      moth.speed += 6;
+      for (let i = 0; i < 3; i++) {
+        const wisp = new Enemy('wisp', this.wave, {
+          x: moth.x + (i - 1) * 26,
+          y: moth.y + 14,
+          waypoint: moth.waypoint,
+          distance: moth.distance,
+        });
+        this.enemies.push(wisp);
+      }
+      this.effects.push({ kind: 'split', x: moth.x, y: moth.y, color: '#a86fd0', t: 0 });
+      this.showBanner('The Dread Moth splits — wisps scatter!', 2.2);
+      this.sounds.leak();
+    } else if (moth.mothPhase === 1 && frac <= 1 / 3) {
+      moth.mothPhase = 2;
+      moth.speed += 6;
+      const near = [...this.towers]
+        .sort((a, b) => Math.hypot(a.x - moth.x, a.y - moth.y) - Math.hypot(b.x - moth.x, b.y - moth.y))
+        .slice(0, 2);
+      for (const tower of near) {
+        tower.dimUntil = this.now + 4;
+        tower.dimFactor = 0.8;
+      }
+      this.effects.push({ kind: 'shadow', x: moth.x, y: moth.y, color: '#3d2b52', t: 0 });
+      this.showBanner("The Moth's shadow falls — the towers dim!", 2.2);
+      this.sounds.leak();
+    }
   }
 
   onKill(enemy) {
@@ -184,7 +236,9 @@ export class GameState {
   }
 
   onWaveCleared() {
-    const bonus = ECONOMY.waveClearBonus + ECONOMY.waveClearPerWave * this.wave;
+    // Keeper's Due pays its extra gold on every wave cleared from now on.
+    const bonus = ECONOMY.waveClearBonus + ECONOMY.waveClearPerWave * this.wave
+      + 6 * (this.blessings.keepersDue || 0);
     this.gold += bonus;
     this.goldEarned += bonus;
     this.score += 100 * this.wave;
@@ -198,7 +252,24 @@ export class GameState {
     } else {
       this.phase = PHASES.BUILD;
       this.showBanner(`Wave ${this.wave} cleared  ·  +${bonus} gold`, 2.2);
+      // The Keeper chooses one of three blessings before the next wave.
+      // Once every blessing is held twice, the ember has nothing left
+      // to offer and the wave simply waits for the Keeper.
+      this.blessingOffer = drawBlessingOffer(this.rng, this.blessings);
+      this.blessingPending = this.blessingOffer.length > 0;
     }
+  }
+
+  // Take one of the three blessings on offer. The next wave waits until
+  // the Keeper chooses.
+  pickBlessing(id) {
+    if (!this.blessingPending || !this.blessingOffer) return false;
+    if (!this.blessingOffer.includes(id)) return false;
+    this.blessings[id] = (this.blessings[id] || 0) + 1;
+    this.blessingOffer = null;
+    this.blessingPending = false;
+    this.sounds.blessing();
+    return true;
   }
 
   // --- Building: the rules for spending gold on the board. ---

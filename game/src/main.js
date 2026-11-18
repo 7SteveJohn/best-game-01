@@ -4,6 +4,7 @@
 // drawing; it runs the loop, keeps the DOM honest about the state, and
 // turns clicks into builds, upgrades and waves.
 import { BOARD, TOWERS, TOWER_ORDER, TOTAL_WAVES, PALETTE } from './config.js';
+import { BLESSINGS, describeBlessings } from './blessings.js';
 import { Rng } from './random.js';
 import { SoundBank } from './audio.js';
 import { GameState, PHASES } from './state.js';
@@ -40,6 +41,7 @@ export class Emberlight {
       onHover: (cell) => { this.view.hover = cell; },
       onCellClick: (col, row) => this.onCellClick(col, row),
       onPickType: (type) => this.pickType(type),
+      onPickIndex: (index) => this.onPickIndex(index),
       onStartWave: () => this.onStartWave(),
       onTogglePause: () => this.onTogglePause(),
       onToggleSpeed: () => this.onToggleSpeed(),
@@ -62,7 +64,9 @@ export class Emberlight {
   autoBuild(type, col, row) {
     const def = TOWERS[type];
     if (!this.state.buildTower(type, col, row, def)) return false;
-    this.state.towers.push(new Tower(type, col, row));
+    // The tower shares the state's blessings object, so a blessing
+    // chosen later still reaches towers built before it.
+    this.state.towers.push(new Tower(type, col, row, this.state.blessings));
     return true;
   }
 
@@ -79,6 +83,66 @@ export class Emberlight {
     }
     this.refreshShop();
     this.refreshSelected();
+  }
+
+  // Number keys 1-4. While a blessing waits to be chosen, the same keys
+  // pick the blessing instead of a tower — the wave cannot start until
+  // the Keeper chooses, so the keys must answer the choice, not the shop.
+  onPickIndex(index) {
+    if (this.state.blessingPending) {
+      this.pickBlessing(index);
+      return;
+    }
+    const type = TOWER_ORDER[index];
+    if (type) this.pickType(type);
+  }
+
+  // Choose one of the three blessings on offer, by its place in the
+  // offer (0, 1 or 2). Bots and play-tests call this with an index.
+  pickBlessing(index) {
+    const state = this.state;
+    if (!state.blessingPending || !state.blessingOffer) return false;
+    const id = state.blessingOffer[index];
+    if (!id) return false;
+    if (!state.pickBlessing(id)) return false;
+    this.sounds.click();
+    this.refreshHud();
+    return true;
+  }
+
+  // Draw the blessing picker from the state's offer, or hide it. The
+  // HUD refreshes every frame, so the cards are only rebuilt when the
+  // offer itself changes — rebuilding them under the mouse would make
+  // the choice unclickable.
+  refreshBlessings() {
+    const screen = $('blessing-screen');
+    const state = this.state;
+    if (!state.blessingPending || !state.blessingOffer) {
+      screen.classList.add('hidden');
+      this.blessingOfferShown = null;
+      return;
+    }
+    const key = state.blessingOffer.join(',');
+    if (this.blessingOfferShown === key) return;
+    this.blessingOfferShown = key;
+    const cards = $('blessing-cards');
+    cards.innerHTML = '';
+    state.blessingOffer.forEach((id, i) => {
+      const def = BLESSINGS[id];
+      const count = state.blessings[id] || 0;
+      const card = document.createElement('button');
+      card.className = 'blessing-card';
+      card.innerHTML = `
+        <span class="blessing-key">${i + 1}</span>
+        <span class="blessing-icon">${def.icon}</span>
+        <span class="blessing-name">${def.name}${count > 0 ? ` ×${count}` : ''}</span>
+        <span class="blessing-blurb">${def.blurb}</span>
+        <span class="blessing-detail">${def.detail}</span>`;
+      card.addEventListener('click', () => this.pickBlessing(i));
+      cards.appendChild(card);
+    });
+    $('blessing-wave').textContent = `Wave ${state.wave} cleared — the ember offers a blessing`;
+    screen.classList.remove('hidden');
   }
 
   cancelSelection() {
@@ -159,10 +223,12 @@ export class Emberlight {
     this.particles = new Particles();
     this.view = { hover: null, placeType: null, placeDef: null, selected: null };
     this.frozen = false;
+    this.stagedDecor = false;
     this.lastKills = 0;
     this.lastEmber = this.state.ember;
     this.lastGold = this.state.gold;
     $('end-screen').classList.add('hidden');
+    $('blessing-screen').classList.add('hidden');
     $('title-screen').classList.remove('hidden');
     this.refreshHud();
     this.refreshShop();
@@ -170,8 +236,15 @@ export class Emberlight {
   }
 
   // Begin a real game from the title screen: hide the overlay, then
-  // let the state open the build phase.
+  // let the state open the build phase. A staged title shot decorates
+  // the board with wisps and towers; they are props, not a head start,
+  // so they are cleared here before play begins.
   beginPlay() {
+    if (this.stagedDecor) {
+      this.state.towers = [];
+      this.state.enemies = [];
+      this.stagedDecor = false;
+    }
     $('title-screen').classList.add('hidden');
     this.state.startGame();
     this.refreshHud();
@@ -266,11 +339,11 @@ export class Emberlight {
     if (next === 4 && !has('lantern')) {
       return 'Wave 4 brings Wraiths that heal as they walk — a Frost Lantern near the bend holds them still.';
     }
-    if (next === 6 && !has('spire') && upgraded === 0) {
-      return 'Wave 6 brings Brutes — upgrade a damage tower near a bend, or add a Storm Spire.';
+    if (next === 6 && !has('spire') && !has('bell') && upgraded === 0) {
+      return 'Wave 6 brings Brutes — a Tide Bell near a bend marks them for +15 a hit, or add a Storm Spire.';
     }
-    if (next === 9 && !has('spire') && upgraded < 2) {
-      return 'Wave 9 is a wall of Brutes — your damage needs to be concentrated, not spread thin. Upgrade, or add a Spire.';
+    if (next === 9 && !has('spire') && !has('bell') && upgraded < 2) {
+      return 'Wave 9 is a wall of Brutes — your damage needs to be concentrated, not spread thin. A Tide Bell marks them; a Spire leaps between them.';
     }
     return null;
   }
@@ -304,6 +377,14 @@ export class Emberlight {
     }
     const advice = $('advice');
     if (advice) advice.textContent = this.currentAdvice();
+    // The blessings the Keeper has chosen, kept visible in the panel.
+    const blessings = $('blessings');
+    if (blessings) {
+      const lines = describeBlessings(this.state.blessings);
+      blessings.innerHTML = lines.length
+        ? lines.map((line) => `<li>${line}</li>`).join('')
+        : '<li class="hint">None yet — clear a wave and the ember offers one.</li>';
+    }
   }
 
   refreshSelected() {
@@ -361,8 +442,13 @@ export class Emberlight {
     $('kills').textContent = `${state.kills}`;
     const waveBtn = $('btn-wave');
     if (state.phase === PHASES.BUILD && state.wave < TOTAL_WAVES) {
-      waveBtn.disabled = false;
-      waveBtn.textContent = `Start Wave ${state.nextWaveNumber}  (Space)`;
+      if (state.blessingPending) {
+        waveBtn.disabled = true;
+        waveBtn.textContent = 'Choose a blessing first';
+      } else {
+        waveBtn.disabled = false;
+        waveBtn.textContent = `Start Wave ${state.nextWaveNumber}  (Space)`;
+      }
     } else {
       waveBtn.disabled = true;
       waveBtn.textContent = state.phase === PHASES.WAVE ? `Wave ${state.wave} in progress…` : 'Start Wave';
@@ -371,6 +457,7 @@ export class Emberlight {
     $('btn-pause').textContent = state.paused ? 'Resume (P)' : 'Pause (P)';
     $('btn-sound').textContent = this.sounds.muted ? 'Sound off (M)' : 'Sound on (M)';
     this.refreshShop();
+    this.refreshBlessings();
   }
 
   bindButtons() {
