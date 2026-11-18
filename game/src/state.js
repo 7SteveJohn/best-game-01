@@ -3,10 +3,11 @@
 // State owns the gold, the ember, the waves and the win/lose conditions,
 // and knows nothing about drawing or input. The loop asks it to update
 // the world a small step at a time; the HUD reads its numbers.
-import { ECONOMY, TOTAL_WAVES } from './config.js';
+import { ECONOMY, TIDES, TOTAL_WAVES, tideFor } from './config.js';
 import { Enemy } from './enemies.js';
 import { buildWaveQueue } from './levels.js';
 import { BLESSINGS, freshBlessings, drawBlessingOffer } from './blessings.js';
+import { Beacon } from './beacon.js';
 
 // What the Keeper is told after a leak: one line per creature, naming
 // the fix instead of only the loss. The panel shows the latest one.
@@ -59,6 +60,10 @@ export class GameState {
     this.blessings = freshBlessings();
     this.blessingOffer = null; // three blessing ids, or null
     this.blessingPending = false;
+    // The Tide over the wave now running, and the Beacon Flare — the
+    // lighthouse's own weapon, fired at most once a wave.
+    this.tide = null; // a tide id ('stillair' | 'ashfall' | 'blackout')
+    this.beacon = new Beacon();
   }
 
   get waveInProgress() {
@@ -67,6 +72,12 @@ export class GameState {
 
   get nextWaveNumber() {
     return this.wave + 1;
+  }
+
+  // The tide the next wave will run under — the forecast the Keeper
+  // plans around between waves.
+  get nextTide() {
+    return this.wave < TOTAL_WAVES ? tideFor(this.wave + 1) : null;
   }
 
   get waveComplete() {
@@ -87,8 +98,12 @@ export class GameState {
     this.spawnQueue = buildWaveQueue(this.wave);
     this.spawnClock = 0;
     this.waveClock = 0;
+    // This wave runs under its tide, and the Beacon is armed again.
+    this.tide = tideFor(this.wave);
+    this.beacon.resetWave();
     const boss = this.wave === TOTAL_WAVES;
-    this.showBanner(boss ? 'The Dread Moth comes…' : `Wave ${this.wave} of ${TOTAL_WAVES}`, 2.2);
+    const tideName = TIDES[this.tide].name;
+    this.showBanner(boss ? `The Dread Moth comes… · ${tideName}` : `Wave ${this.wave} of ${TOTAL_WAVES} — ${tideName}`, 2.2);
     this.sounds.waveHorn();
     return true;
   }
@@ -114,8 +129,11 @@ export class GameState {
       }
     }
 
-    // Towers fire — and the Tide Bell rings.
+    // Towers fire — and the Tide Bell rings. Each tower is told the
+    // tide it stands under, so Ashfall shortens its reach and a
+    // Blackout slows its fire.
     for (const tower of this.towers) {
+      tower.tide = this.tide;
       tower.update(dt, this.enemies, this.projectiles, (t) => this.onTowerShot(t), this.effects, this.now);
     }
 
@@ -123,11 +141,17 @@ export class GameState {
     for (const p of this.projectiles) p.update(dt, this.enemies, this.effects, this.now);
     this.projectiles = this.projectiles.filter((p) => !p.dead);
 
+    // The Beacon's blaze burns where the Keeper aimed it.
+    this.beacon.update(dt, this);
+
     // Creatures walk, heal, and reach the door.
     for (const enemy of this.enemies) enemy.update(dt, this.now);
     for (const enemy of this.enemies) {
       if (enemy.leaked) this.onLeak(enemy);
-      else if (enemy.dead) this.onKill(enemy);
+      else if (enemy.dead) {
+        if (enemy.killedByFlare) this.beacon.kills += 1;
+        this.onKill(enemy);
+      }
     }
     this.enemies = this.enemies.filter((e) => !e.dead && !e.leaked);
 

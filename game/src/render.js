@@ -4,7 +4,7 @@
 // ground, path, grass). Each frame the renderer draws that layer, then
 // the living things: the lighthouse beam, the flame, the towers, the
 // creatures, the shots, the sparks, and the placement guides.
-import { BOARD, PATH_CELLS, PALETTE } from './config.js';
+import { BEACON, BLACKOUT_COLS, BOARD, PATH_CELLS, PALETTE } from './config.js';
 import { cellCenter, isBuildable } from './levels.js';
 
 export class Renderer {
@@ -108,6 +108,52 @@ export class Renderer {
       ctx.fill();
     }
 
+    // Landmarks, so the open middle reads as a shore and not an empty
+    // field: standing stones in the northern grass, a beached boat on
+    // the south-west sand, and tide pools catching the moon near the
+    // door. They sit on the base layer, under the towers.
+    const stones = [
+      { x: 6 * BOARD.cell + 32, y: 1 * BOARD.cell + 30 },
+      { x: 7 * BOARD.cell + 20, y: 1 * BOARD.cell + 18 },
+      { x: 7 * BOARD.cell + 44, y: 0 * BOARD.cell + 34 },
+    ];
+    for (const s of stones) {
+      ctx.fillStyle = '#39415c';
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, 9, 22, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(180, 195, 220, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(s.x - 3, s.y - 8, 4, 10, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // A beached boat, hull up, on the south-west sand.
+    const boatX = 1 * BOARD.cell + 32;
+    const boatY = 7 * BOARD.cell + 40;
+    ctx.fillStyle = '#4d3a28';
+    ctx.beginPath();
+    ctx.ellipse(boatX, boatY, 26, 9, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#6b5138';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(boatX - 18, boatY - 6);
+    ctx.lineTo(boatX + 18, boatY - 6);
+    ctx.stroke();
+    // Tide pools: still water catching the moon, near the door.
+    for (const pool of [
+      { x: 12 * BOARD.cell + 32, y: 0 * BOARD.cell + 26 },
+      { x: 13 * BOARD.cell + 16, y: 1 * BOARD.cell + 40 },
+    ]) {
+      const wash = ctx.createRadialGradient(pool.x, pool.y, 2, pool.x, pool.y, 26);
+      wash.addColorStop(0, 'rgba(120, 180, 200, 0.35)');
+      wash.addColorStop(1, 'rgba(120, 180, 200, 0)');
+      ctx.fillStyle = wash;
+      ctx.beginPath();
+      ctx.ellipse(pool.x, pool.y, 26, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Grass tufts scattered on the buildable ground.
     for (let i = 0; i < 240; i++) {
       const x = this.rng.range(0, BOARD.width);
@@ -169,14 +215,117 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
+    this.drawTide(ctx, state, now);
+    this.drawFlareGround(ctx, state, now);
     this.drawLighthouse(ctx, state, now);
     this.drawPlacementGuides(ctx, state, view);
     for (const tower of state.towers) this.drawTower(ctx, tower, now, state);
-    for (const enemy of state.enemies) this.drawEnemy(ctx, enemy, now);
+    for (const enemy of state.enemies) this.drawEnemy(ctx, enemy, now, state);
     this.drawProjectiles(ctx, state);
+    this.drawFlareBeam(ctx, state, now);
     this.drawEffects(ctx, state);
     this.drawParticles(ctx, particles);
     this.drawBanner(ctx, state);
+    ctx.restore();
+  }
+
+  // The tide's whole-board treatment, over the base and under the
+  // living things: ash drifting down in Ashfall, a dark cloud with a
+  // gold outline over the middle columns in a Blackout, a still bright
+  // shimmer in Still Air. Only while a wave is running.
+  drawTide(ctx, state, now) {
+    const tide = state.tide;
+    if (!tide || state.phase !== 'wave') return;
+    if (tide === 'ashfall') {
+      ctx.fillStyle = 'rgba(200, 190, 175, 0.55)';
+      for (let i = 0; i < 46; i++) {
+        const x = (i * 137 + now * 14) % BOARD.width;
+        const y = (i * 89 + now * 34) % BOARD.height;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (tide === 'blackout') {
+      const x0 = BLACKOUT_COLS.from * BOARD.cell;
+      const x1 = (BLACKOUT_COLS.to + 1) * BOARD.cell;
+      ctx.fillStyle = 'rgba(5, 7, 15, 0.38)';
+      ctx.fillRect(x0, 0, x1 - x0, BOARD.height);
+      ctx.strokeStyle = 'rgba(255, 215, 106, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.strokeRect(x0 + 2, 2, x1 - x0 - 4, BOARD.height - 4);
+      ctx.setLineDash([]);
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 215, 106, 0.8)';
+      ctx.fillText('BLACKOUT', (x0 + x1) / 2, 18);
+    } else if (tide === 'stillair') {
+      ctx.fillStyle = 'rgba(255, 240, 200, 0.05)';
+      ctx.fillRect(0, 0, BOARD.width, BOARD.height);
+      for (let i = 0; i < 14; i++) {
+        const x = (i * 211 + now * 8) % BOARD.width;
+        const y = 60 + ((i * 67) % 440);
+        ctx.globalAlpha = 0.2 + 0.3 * Math.abs(Math.sin(now * 1.2 + i));
+        ctx.fillStyle = 'rgba(255, 240, 200, 0.5)';
+        ctx.beginPath();
+        ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // The Beacon Flare's blazing ground: orange, flickering, brighter at
+  // the centre, with a gold edge so the 3x3 zone reads at a glance.
+  drawFlareGround(ctx, state, now) {
+    const beacon = state.beacon;
+    if (!beacon.flare) return;
+    const z = beacon.zoneCells();
+    const x0 = z.c0 * BOARD.cell;
+    const y0 = z.r0 * BOARD.cell;
+    const w = (z.c1 - z.c0 + 1) * BOARD.cell;
+    const h = (z.r1 - z.r0 + 1) * BOARD.cell;
+    const cx = x0 + w / 2;
+    const cy = y0 + h / 2;
+    const flick = 0.75 + Math.sin(now * 11) * 0.1 + Math.sin(now * 23) * 0.05;
+    const glow = ctx.createRadialGradient(cx, cy, 8, cx, cy, Math.max(w, h) * 0.75);
+    glow.addColorStop(0, `rgba(255, 138, 36, ${0.55 * flick})`);
+    glow.addColorStop(0.6, `rgba(255, 179, 71, ${0.3 * flick})`);
+    glow.addColorStop(1, 'rgba(255, 138, 36, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(x0 - 30, y0 - 30, w + 60, h + 60);
+    ctx.strokeStyle = 'rgba(255, 215, 106, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x0 + 2, y0 + 2, w - 4, h - 4);
+  }
+
+  // The beam from the lighthouse lamp to the blaze, drawn over the
+  // towers and creatures so the shot reads as the lighthouse firing.
+  drawFlareBeam(ctx, state, now) {
+    const beacon = state.beacon;
+    if (!beacon.flare) return;
+    const z = beacon.zoneCells();
+    const cx = ((z.c0 + z.c1) / 2 + 0.5) * BOARD.cell;
+    const cy = ((z.r0 + z.r1) / 2 + 0.5) * BOARD.cell;
+    const lamp = cellCenter(14, 6);
+    const lampX = lamp.x - 4;
+    const lampY = lamp.y + 28 - 118;
+    const angle = Math.atan2(cy - lampY, cx - lampX);
+    const dist = Math.hypot(cx - lampX, cy - lampY);
+    ctx.save();
+    ctx.translate(lampX, lampY);
+    ctx.rotate(angle);
+    const beam = ctx.createLinearGradient(0, 0, dist, 0);
+    beam.addColorStop(0, 'rgba(255, 233, 168, 0.5)');
+    beam.addColorStop(1, 'rgba(255, 179, 71, 0.25)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(dist, -34);
+    ctx.lineTo(dist, 34);
+    ctx.lineTo(0, 5);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 
@@ -268,6 +417,25 @@ export class Renderer {
         ctx.arc(cx + BOARD.cell / 2, cy + BOARD.cell / 2, view.placeDef.range, 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+    // Aiming the Beacon: the 3x3 patch the flare will set alight, with
+    // its price, so the click is a decision made with open eyes.
+    if (view.beaconArmed && hover && state.phase === 'wave') {
+      const r = BEACON.radiusCells;
+      const c0 = Math.max(0, hover.col - r);
+      const c1 = Math.min(BOARD.cols - 1, hover.col + r);
+      const r0 = Math.max(0, hover.row - r);
+      const r1 = Math.min(BOARD.rows - 1, hover.row + r);
+      ctx.fillStyle = 'rgba(255, 138, 36, 0.3)';
+      ctx.fillRect(c0 * BOARD.cell + 2, r0 * BOARD.cell + 2, (c1 - c0 + 1) * BOARD.cell - 4, (r1 - r0 + 1) * BOARD.cell - 4);
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(c0 * BOARD.cell + 2, r0 * BOARD.cell + 2, (c1 - c0 + 1) * BOARD.cell - 4, (r1 - r0 + 1) * BOARD.cell - 4);
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd76a';
+      const labelY = Math.max(14, r0 * BOARD.cell - 6);
+      ctx.fillText('Beacon Flare · 2 ember', (c0 + c1 + 1) * BOARD.cell / 2, labelY);
     }
   }
 
@@ -383,10 +551,11 @@ export class Renderer {
     }
   }
 
-  drawEnemy(ctx, enemy, now) {
+  drawEnemy(ctx, enemy, now, state) {
     const { x, y } = enemy;
     const bob = Math.sin(now * 5 + enemy.wobble) * 2;
     const chilled = now < enemy.slowUntil;
+    const inFlare = state && state.beacon ? state.beacon.inZone(enemy) : false;
     ctx.save();
     ctx.translate(x, y + bob * 0.4);
 
@@ -478,6 +647,14 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // An orange ring while the creature stands in the Beacon's blaze.
+    if (inFlare) {
+      ctx.strokeStyle = 'rgba(255, 138, 36, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.radius + 7, 0, Math.PI * 2);
       ctx.stroke();
     }
     // A Tide Bell's mark: a gold diamond over the creature, so the

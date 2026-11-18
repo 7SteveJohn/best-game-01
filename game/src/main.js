@@ -3,7 +3,7 @@
 // main.js wires the pieces together. It owns no balance numbers and no
 // drawing; it runs the loop, keeps the DOM honest about the state, and
 // turns clicks into builds, upgrades and waves.
-import { BOARD, TOWERS, TOWER_ORDER, TOTAL_WAVES, PALETTE } from './config.js';
+import { BEACON, BOARD, TIDES, TOWERS, TOWER_ORDER, TOTAL_WAVES, PALETTE } from './config.js';
 import { BLESSINGS, describeBlessings } from './blessings.js';
 import { Rng } from './random.js';
 import { SoundBank } from './audio.js';
@@ -30,7 +30,7 @@ export class Emberlight {
     this.canvas.width = BOARD.width;
     this.canvas.height = BOARD.height;
     this.renderer = new Renderer(this.canvas, this.rng);
-    this.view = { hover: null, placeType: null, placeDef: null, selected: null };
+    this.view = { hover: null, placeType: null, placeDef: null, selected: null, beaconArmed: false };
     this.frozen = false;
     this.lastKills = 0;
     this.lastEmber = this.state.ember;
@@ -48,6 +48,7 @@ export class Emberlight {
       onToggleMute: () => this.onToggleMute(),
       onCancel: () => this.cancelSelection(),
       onRestartKey: () => this.onRestartKey(),
+      onArmBeacon: () => this.onArmBeacon(),
     });
     this.loop = this.loop.bind(this);
     this.lastTime = performance.now();
@@ -73,6 +74,7 @@ export class Emberlight {
   pickType(type) {
     this.sounds.unlock();
     this.sounds.click();
+    this.view.beaconArmed = false;
     if (this.view.placeType === type) {
       this.view.placeType = null;
       this.view.placeDef = null;
@@ -149,14 +151,57 @@ export class Emberlight {
     this.view.placeType = null;
     this.view.placeDef = null;
     this.view.selected = null;
+    this.view.beaconArmed = false;
     this.refreshShop();
     this.refreshSelected();
+    this.refreshBeacon();
+  }
+
+  // Arm the Beacon: the next board click aims the flare. Key 5 or the
+  // panel button toggles it; picking a tower disarms it.
+  onArmBeacon() {
+    const state = this.state;
+    if (state.phase !== PHASES.WAVE) return;
+    if (!state.beacon.canFire(state)) return;
+    this.view.beaconArmed = !this.view.beaconArmed;
+    this.view.placeType = null;
+    this.view.placeDef = null;
+    this.view.selected = null;
+    this.sounds.click();
+    this.refreshHud();
+    this.refreshSelected();
+  }
+
+  // Fire the flare at a board cell. Bots and play-tests call this
+  // directly; a human fires it by arming the Beacon and clicking.
+  fireBeacon(col, row) {
+    const state = this.state;
+    if (!state.beacon.fire(state, col, row)) return false;
+    const z = state.beacon.zoneCells();
+    const cx = ((z.c0 + z.c1) / 2 + 0.5) * BOARD.cell;
+    const cy = ((z.r0 + z.r1) / 2 + 0.5) * BOARD.cell;
+    this.sounds.flare();
+    this.particles.addShake(6);
+    this.particles.burst(cx, cy, '#ff8a24', 26, 180);
+    this.particles.burst(cx, cy, '#ffd76a', 18, 120);
+    this.particles.floatText(14 * BOARD.cell + 28, 6 * BOARD.cell + 40, '-2 ember', '#ff8a24');
+    this.view.beaconArmed = false;
+    this.refreshHud();
+    return true;
   }
 
   onCellClick(col, row) {
     this.sounds.unlock();
     const state = this.state;
     if (state.phase === PHASES.TITLE || state.phase === PHASES.WON || state.phase === PHASES.LOST) return;
+    // Aiming the Beacon: the click is the flare's target, whatever
+    // stands on that cell.
+    if (this.view.beaconArmed) {
+      if (state.beacon.canFire(state)) this.fireBeacon(col, row);
+      else this.view.beaconArmed = false;
+      this.refreshHud();
+      return;
+    }
     const tower = state.towerAt(col, row);
     if (tower) {
       this.view.selected = tower;
@@ -189,6 +234,7 @@ export class Emberlight {
     if (this.state.phase !== PHASES.BUILD) return;
     this.sounds.unlock();
     this.view.selected = null;
+    this.view.beaconArmed = false;
     this.refreshSelected();
     this.state.startWave();
     this.refreshHud();
@@ -221,7 +267,7 @@ export class Emberlight {
   resetGame() {
     this.state = new GameState(this.rng, this.sounds);
     this.particles = new Particles();
-    this.view = { hover: null, placeType: null, placeDef: null, selected: null };
+    this.view = { hover: null, placeType: null, placeDef: null, selected: null, beaconArmed: false };
     this.frozen = false;
     this.stagedDecor = false;
     this.lastKills = 0;
@@ -265,6 +311,17 @@ export class Emberlight {
       // The lighthouse ember sheds sparks while the game is live.
       if ((state.phase === PHASES.BUILD || state.phase === PHASES.WAVE) && Math.random() < 0.35) {
         this.particles.emberDrift(14 * BOARD.cell + 28, 6 * BOARD.cell + 56);
+      }
+      // The Beacon's blaze throws up sparks while it burns.
+      const flare = state.beacon.flare;
+      if (flare && state.phase === PHASES.WAVE && Math.random() < 0.7) {
+        const z = state.beacon.zoneCells();
+        const col = z.c0 + Math.floor(Math.random() * (z.c1 - z.c0 + 1));
+        const row = z.r0 + Math.floor(Math.random() * (z.r1 - z.r0 + 1));
+        this.particles.burst(
+          col * BOARD.cell + BOARD.cell / 2, row * BOARD.cell + BOARD.cell / 2,
+          Math.random() < 0.5 ? '#ff8a24' : '#ffd76a', 3, 60,
+        );
       }
       if ((state.phase === PHASES.WON || state.phase === PHASES.LOST) && !this.endShown) {
         this.showEndScreen();
@@ -371,9 +428,22 @@ export class Emberlight {
     }
     const next = $('next-wave');
     if (next) {
-      next.textContent = this.state.wave >= TOTAL_WAVES
-        ? 'All waves faced.'
-        : `Next: Wave ${this.state.nextWaveNumber} — ${describeWave(this.state.nextWaveNumber)}`;
+      if (this.state.wave >= TOTAL_WAVES) {
+        next.textContent = 'All waves faced.';
+      } else {
+        next.textContent = `Next: Wave ${this.state.nextWaveNumber} — ${describeWave(this.state.nextWaveNumber)}`;
+      }
+    }
+    // The tide forecast: what the next wave will run under, so the
+    // Keeper can plan the build around it.
+    const tideEl = $('tide');
+    if (tideEl) {
+      if (this.state.wave >= TOTAL_WAVES) {
+        tideEl.textContent = '';
+      } else {
+        const tide = TIDES[this.state.nextTide];
+        tideEl.textContent = `${tide.icon} Tide: ${tide.name} — ${tide.blurb}`;
+      }
     }
     const advice = $('advice');
     if (advice) advice.textContent = this.currentAdvice();
@@ -458,10 +528,44 @@ export class Emberlight {
     $('btn-sound').textContent = this.sounds.muted ? 'Sound off (M)' : 'Sound on (M)';
     this.refreshShop();
     this.refreshBlessings();
+    this.refreshBeacon();
+  }
+
+  // The Beacon Flare card: what it can do, whether the Keeper can arm
+  // it now, and what it has already burned this game.
+  refreshBeacon() {
+    const btn = $('btn-beacon');
+    if (!btn) return;
+    const state = this.state;
+    const beacon = state.beacon;
+    const armed = this.view.beaconArmed;
+    if (state.phase !== PHASES.WAVE) {
+      btn.disabled = true;
+      btn.textContent = 'Beacon Flare · 2 ember (5)';
+    } else if (beacon.usedThisWave) {
+      btn.disabled = true;
+      btn.textContent = 'Beacon spent this wave';
+    } else if (state.ember < BEACON.minEmber) {
+      btn.disabled = true;
+      btn.textContent = `Beacon needs ${BEACON.minEmber} ember to fire`;
+    } else if (armed) {
+      btn.disabled = false;
+      btn.textContent = 'Aiming… click a cell (Esc to cancel)';
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Fire the Beacon · 2 ember (5)';
+    }
+    const note = $('beacon-note');
+    if (note) {
+      note.textContent = beacon.casts > 0
+        ? `Fired ${beacon.casts} time${beacon.casts > 1 ? 's' : ''} — ${Math.round(beacon.damageDealt)} damage dealt, ${beacon.kills} creatures burned.`
+        : 'Once per wave, the lighthouse itself burns a 3×3 patch of ground for 4s: 30 damage a second, 35% slow. It costs ember to save ember.';
+    }
   }
 
   bindButtons() {
     $('btn-wave').addEventListener('click', () => this.onStartWave());
+    $('btn-beacon').addEventListener('click', () => this.onArmBeacon());
     $('btn-speed').addEventListener('click', () => this.onToggleSpeed());
     $('btn-pause').addEventListener('click', () => this.onTogglePause());
     $('btn-sound').addEventListener('click', () => this.onToggleMute());
@@ -487,7 +591,8 @@ export class Emberlight {
       <span><b>${state.kills}</b> creatures burned</span>
       <span><b>${state.goldEarned}</b> gold earned</span>
       <span><b>${state.score}</b> score</span>
-      <span><b>${state.ember}/${state.maxEmber}</b> ember left</span>`;
+      <span><b>${state.ember}/${state.maxEmber}</b> ember left</span>
+      <span><b>${state.beacon.casts}</b> beacon flares fired</span>`;
     $('btn-again').textContent = won ? 'Play Again (R)' : 'Try Again (R)';
     $('end-screen').classList.remove('hidden');
   }

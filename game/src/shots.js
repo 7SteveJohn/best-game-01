@@ -35,6 +35,24 @@ function enemyCount(game) {
   return game.state.enemies.filter((e) => !e.dead && !e.leaked).length;
 }
 
+// The 3x3 patch holding the most creature health — where a flare
+// earns its ember.
+function bestFlareCell(state) {
+  let best = null;
+  let bestHp = 0;
+  for (let col = 0; col < 15; col++) {
+    for (let row = 0; row < 9; row++) {
+      let hp = 0;
+      for (const e of state.enemies) {
+        if (e.dead || e.leaked) continue;
+        if (Math.abs(e.col - col) <= 1 && Math.abs(e.row - row) <= 1) hp += e.hp;
+      }
+      if (hp > bestHp) { bestHp = hp; best = { col, row }; }
+    }
+  }
+  return bestHp > 0 ? best : null;
+}
+
 export function stageShot(game, params) {
   const shot = params.get('shot');
   if (!shot) return false;
@@ -92,6 +110,14 @@ export function stageShot(game, params) {
     game.state.startWave();
     // Run the wave forward a fixed number of steps, then freeze it.
     game.simulate(late ? 8 : 6);
+    // The Beacon Flare mid-burn: aim it at the thickest patch of the
+    // march and let it burn a second and a half, so the frame shows
+    // the beam, the blazing ground and the creatures caught in it.
+    const best = bestFlareCell(game.state);
+    if (best) {
+      game.fireBeacon(best.col, best.row);
+      game.simulate(1.5);
+    }
     // The HUD's kills and score are cumulative, but this shot only
     // simulated the current wave — so they would read "1 kill" on wave
     // eight. Add the run so far, honestly counted from the wave
@@ -145,12 +171,12 @@ export function stageShot(game, params) {
         });
       }
       game.state.gold = 380;
-      game.state.ember = 9;
-      game.state.showBanner('WAVE 8 — THE SHORE SWARMS', 2);
+      game.state.ember = 7; // three leaked earlier, and the flare just burned 2
+      game.state.showBanner('WAVE 8 — ASHFALL · THE SHORE SWARMS', 2);
     } else {
       game.state.gold = 142;
-      game.state.ember = 11;
-      game.state.showBanner('WAVE 3 — THE DARK MARCHES', 2);
+      game.state.ember = 9; // one wisp leaked earlier, and the flare just burned 2
+      game.state.showBanner('WAVE 3 — BLACKOUT · THE DARK MARCHES', 2);
     }
     game.frozen = true;
     return true;
@@ -166,11 +192,13 @@ export function stageShot(game, params) {
     ]) game.autoBuild(type, col, row);
     game.state.wave = 12;
     // A real win, from the greedy-bot playthrough of this version:
-    // 377 kills, 4992 gold earned, score 16264, 7 ember left — the
+    // 377 kills, 5004 gold earned, score 16264, 7 ember left — the
     // Dread Moth itself slipped through at the end, which is why the
-    // ember reads 7 and not 12.
+    // ember reads 7 and not 12. The Keeper held the Beacon Flare
+    // through the whole run: the line never broke before the final
+    // wave, and no flare can save the Moth.
     game.state.kills = 377;
-    game.state.goldEarned = 4992;
+    game.state.goldEarned = 5004;
     game.state.score = 16264;
     game.state.ember = 7;
     // The defeated Dread Moth lies broken at the lighthouse door, in a

@@ -221,7 +221,71 @@ export function spawnGapFor(wave) {
   return Math.max(0.35, 0.9 - wave * 0.045);
 }
 
-// The night palette. Warm amber is the light; cold blue-teal is the dark.
+// The Beacon Flare: the lighthouse burns its own light as a weapon.
+// Mid-wave the Keeper may fire it once, at a cell they click: the
+// 3x3 ground around that cell blazes for four seconds, 30 damage a
+// second and a 35% slow, for 2 ember. It costs health to save health —
+// a real trade, not a free button — and it needs at least 3 ember left
+// to fire, so the Keeper can never burn the last light itself.
+export const BEACON = {
+  costEmber: 2,
+  minEmber: 3, // ember the lighthouse must still hold to fire
+  duration: 4, // seconds the ground blazes
+  dps: 30, // damage per second to each creature in the zone
+  slowFactor: 0.65, // speed inside the blaze; a lantern's chill is stronger
+  radiusCells: 1, // half-width in cells: a 3x3 zone around the aimed cell
+};
+
+// The Tides: one condition per wave, on a fixed three-wave rotation, so
+// the shore is never the same march twice and the Keeper can plan for
+// what is coming. The forecast is shown before the wave starts.
+// Still Air: the first tower hit on each creature lands 50% harder.
+// Ashfall: every tower's reach shrinks 8%. Blackout: towers standing in
+// columns 6-10 (counted from the left) fire 10% slower. The final wave
+// is always Still Air — the last stand, under the clearest sky.
+export const TIDES = {
+  stillair: {
+    id: 'stillair',
+    name: 'Still Air',
+    icon: '🌤',
+    blurb: 'First hits strike +50%.',
+    detail: 'The air holds still: the first tower hit on each creature lands half as hard again.',
+    firstHitBonus: 0.5,
+  },
+  ashfall: {
+    id: 'ashfall',
+    name: 'Ashfall',
+    icon: '🌫',
+    blurb: 'Tower range −8%.',
+    detail: 'Ash drifts over the shore: every tower reaches 8% less far, bells included.',
+    rangeFactor: 0.92,
+  },
+  blackout: {
+    id: 'blackout',
+    name: 'Blackout',
+    icon: '🌑',
+    blurb: 'Towers in columns 6–10 fire 10% slower.',
+    detail: 'A black cloud hangs over the middle of the board: towers standing there fire a tenth slower.',
+    fireRateFactor: 0.9,
+  },
+};
+
+// The middle columns the Blackout hangs over, counted from zero.
+export const BLACKOUT_COLS = { from: 5, to: 9 };
+
+export function tideFor(wave) {
+  // The last wave is always Still Air: the air holds still for the
+  // final stand, and the towers hit their hardest when it matters
+  // most. A Blackout over the Moth's wave would stack a tenth-slower
+  // fire on top of the hardest wave in the game, and the bot runs
+  // showed the line breaking there — a second creature slipping
+  // through beside the Moth, where the third version leaked only it.
+  if (wave === TOTAL_WAVES) return 'stillair';
+  const m = wave % 3;
+  if (m === 1) return 'stillair';
+  if (m === 2) return 'ashfall';
+  return 'blackout';
+}
 // The ground values were lifted from the first version so the board
 // keeps its structure when a screenshot is shrunk: the path and the
 // build ground still read as different places in the dark.
@@ -231,8 +295,8 @@ export const PALETTE = {
   ground: '#17263a',
   groundAlt: '#142338',
   grassTuft: '#315344',
-  path: '#514235',
-  pathEdge: '#79634d',
+  path: '#5a4a3a', // the trodden lane — bright enough to read at thumbnail scale
+  pathEdge: '#8a7358',
   pathStone: '#92785c',
   moon: '#f4ead0',
   star: '#dfe8ff',

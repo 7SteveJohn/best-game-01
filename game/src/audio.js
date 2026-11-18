@@ -148,6 +148,13 @@ export class SoundBank {
     this.tone({ type: 'sine', from: 988, seconds: 0.22, volume: 0.14, delay: 0.1 });
   }
 
+  // The Beacon Flare: a deep boom under a rising whoosh of fire.
+  flare() {
+    this.noise({ seconds: 0.35, volume: 0.3, frequency: 220 });
+    this.tone({ type: 'sawtooth', from: 90, to: 40, seconds: 0.4, volume: 0.2 });
+    this.tone({ type: 'sine', from: 440, to: 1760, seconds: 0.35, volume: 0.1, delay: 0.05 });
+  }
+
   kill() {
     this.tone({ type: 'sine', from: 1320, to: 1760, seconds: 0.08, volume: 0.07 });
   }

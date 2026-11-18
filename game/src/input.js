@@ -1,9 +1,9 @@
 // Emberlight — mouse and keyboard.
 //
-// Clicking is the whole game: pick a tower from the shop (or press 1/2/3),
+// Clicking is the whole game: pick a tower from the shop (or press 1/2/3/4),
 // click a plot to build it, click a tower to see it and upgrade or sell
-// it. Space starts the next wave, P pauses, F doubles the speed, M
-// mutes, Esc puts the hammer down.
+// it. 5 arms the Beacon Flare, Space starts the next wave, P pauses, F
+// doubles the speed, M mutes, Esc puts the hammer down.
 import { BOARD } from './config.js';
 
 export class Input {
@@ -61,6 +61,9 @@ export class Input {
       // blessing in that place. The game decides which; input only
       // reports the place.
       this.handlers.onPickIndex(Number(key) - 1);
+    } else if (key === '5') {
+      // 5 arms the Beacon Flare: the next click on the board aims it.
+      this.handlers.onArmBeacon?.();
     } else if (key === ' ') {
       event.preventDefault();
       this.handlers.onStartWave();

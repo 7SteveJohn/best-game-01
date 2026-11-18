@@ -3,7 +3,7 @@
 // A Tower stands on a plot, picks the creature furthest along the path
 // inside its reach, and fires on a cooldown. Its level raises damage and
 // range; the lantern chills, the spire's bolts leap to nearby creatures.
-import { TOWERS, ECONOMY } from './config.js';
+import { BLACKOUT_COLS, TIDES, TOWERS, ECONOMY } from './config.js';
 
 export class Tower {
   constructor(type, col, row, mods = null) {
@@ -28,6 +28,12 @@ export class Tower {
     this.dimFactor = 1;
     // The Tide Bell rings on this clock instead of firing.
     this.pulseClock = 0;
+    // The tide over this wave, set by the state each step: it shapes
+    // range in Ashfall and fire rate in a Blackout.
+    this.tide = null;
+    // The fire-rate multiplier the current tide leaves this tower with
+    // (1 outside a Blackout, 0.9 inside it); the tests read it.
+    this.tideRateMul = 1;
   }
 
   get damage() {
@@ -40,6 +46,8 @@ export class Tower {
     if (this.type === 'brazier' && this.mods) range += 15 * (this.mods.longFlame || 0);
     // The Dread Moth's shadow shrinks this tower's reach for a while.
     if (this.now !== undefined && this.now < this.dimUntil) range *= this.dimFactor;
+    // Ashfall shrinks every tower's reach, bells included.
+    if (this.tide === 'ashfall') range *= TIDES.ashfall.rangeFactor;
     return range;
   }
 
@@ -98,15 +106,22 @@ export class Tower {
     this.now = now;
     this.cooldown -= dt;
     this.flash = Math.max(0, this.flash - dt);
+    // A Blackout over the middle columns slows the towers standing in
+    // it: they fire a tenth slower, bells ring a tenth slower too.
+    const inBlackout =
+      this.tide === 'blackout' &&
+      this.col >= BLACKOUT_COLS.from && this.col <= BLACKOUT_COLS.to;
+    const rateMul = inBlackout ? TIDES.blackout.fireRateFactor : 1;
+    this.tideRateMul = rateMul;
     if (this.type === 'bell') {
-      this.ring(dt, enemies, effects, now, onShoot);
+      this.ring(dt, enemies, effects, now, onShoot, rateMul);
       return;
     }
     const target = this.acquire(enemies);
     if (!target) return;
     this.angle = Math.atan2(target.y - this.y, target.x - this.x);
     if (this.cooldown > 0) return;
-    this.cooldown = 1 / this.rate;
+    this.cooldown = 1 / (this.rate * rateMul);
     this.flash = 0.09;
     projectiles.push(new Projectile(this, target));
     onShoot(this);
@@ -115,10 +130,10 @@ export class Tower {
   // The Tide Bell rings instead of firing: every creature in reach is
   // marked for a short while, and the next tower hit on each of them
   // lands much harder. The ring itself is an effect the renderer draws.
-  ring(dt, enemies, effects, now, onShoot) {
+  ring(dt, enemies, effects, now, onShoot, rateMul = 1) {
     this.pulseClock -= dt;
     if (this.pulseClock > 0) return;
-    this.pulseClock = this.def.pulseInterval;
+    this.pulseClock = this.def.pulseInterval / rateMul;
     let marked = 0;
     for (const enemy of enemies) {
       if (enemy.dead || enemy.leaked) continue;
@@ -181,6 +196,16 @@ export class Projectile {
       target.markedUntil = 0;
       effects.push({ kind: 'mark', x: target.x, y: target.y, color: '#ffd76a', t: 0 });
     }
+    // Still Air: the first tower hit on a creature lands half as hard
+    // again. The bonus rides on the tower's own damage, after upgrades
+    // and before a spent mark, and it never inflates a spire's chain
+    // jumps — the jumps are struck from the un-boosted damage.
+    let stillAirBonus = 0;
+    if (tower.tide === 'stillair' && !target.firstHitUsed) {
+      stillAirBonus = Math.round(tower.damage * TIDES.stillair.firstHitBonus);
+      target.firstHitUsed = true;
+    }
+    damage += stillAirBonus;
     target.takeDamage(damage);
     effects.push({ kind: 'hit', x: target.x, y: target.y, color: def.color, t: 0 });
     if (def.id === 'lantern') {
@@ -190,7 +215,7 @@ export class Projectile {
     if (def.id === 'spire') {
       // The bolt leaps to the nearest other creatures, weakening each jump.
       let from = target;
-      let jumpDamage = damage;
+      let jumpDamage = damage - stillAirBonus;
       const jumped = new Set([target.id]);
       for (let jump = 0; jump < def.chainTargets; jump++) {
         jumpDamage = Math.round(jumpDamage * tower.chainFalloff);
@@ -205,7 +230,14 @@ export class Projectile {
           }
         }
         if (!nearest) break;
-        nearest.takeDamage(jumpDamage);
+        // A creature first struck by a chain jump gets its own
+        // Still Air allowance on that jump.
+        let jd = jumpDamage;
+        if (tower.tide === 'stillair' && !nearest.firstHitUsed) {
+          jd = Math.round(jd * (1 + TIDES.stillair.firstHitBonus));
+          nearest.firstHitUsed = true;
+        }
+        nearest.takeDamage(jd);
         effects.push({
           kind: 'bolt', x1: from.x, y1: from.y, x2: nearest.x, y2: nearest.y,
           color: def.color, t: 0,

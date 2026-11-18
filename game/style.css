@@ -117,7 +117,16 @@ button:disabled { opacity: 0.45; cursor: default; }
 #selected .row button { flex: 1; }
 .hint { font-size: 12.5px; color: #9aa7c7; line-height: 1.5; margin: 4px 0; }
 .hint.strong { font-size: 13.5px; color: #ffd76a; font-weight: 600; }
-/* The Keeper's advice: what to fix, not only that something went wrong. */
+/* The tide forecast under the next-wave line. */
+.tide { font-size: 13px; color: #ffd76a; line-height: 1.5; margin: 4px 0; min-height: 19px; }
+.tide:empty { display: none; }
+/* The Beacon Flare: the lighthouse's own weapon, in the side panel. */
+.beacon-btn {
+  width: 100%; padding: 10px 11px; font-size: 14px; font-weight: 700;
+  background: #7a4a12; border: 1px solid #ffb347; color: #fff3d6; border-radius: 8px;
+}
+.beacon-btn:hover:not(:disabled) { background: #96600f; }
+#beacon-note { margin-top: 6px; }
 .advice { font-size: 13px; color: #ffb347; line-height: 1.5; margin: 6px 0 0; min-height: 19px; }
 .advice:empty { display: none; }
 .notes { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: #c6cfe6; }

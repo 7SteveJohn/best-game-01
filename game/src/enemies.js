@@ -3,7 +3,7 @@
 // An Enemy walks the waypoint path, takes damage, can be chilled, and
 // heals a little if it is a wraith. When it reaches the lighthouse door
 // it spends itself against the ember and is gone.
-import { ENEMIES, enemyHpFor } from './config.js';
+import { BEACON, BOARD, ENEMIES, enemyHpFor } from './config.js';
 import { WAYPOINTS } from './levels.js';
 
 let nextId = 1;
@@ -42,6 +42,11 @@ export class Enemy {
     // harder, then the mark is spent.
     this.markedUntil = 0;
     this.markBonus = 0;
+    // The Beacon's blaze: a 35% slow while the ground burns under it.
+    this.flareUntil = 0;
+    // Still Air: the first tower hit on this creature lands half as
+    // hard again. Each creature gets its own allowance, once.
+    this.firstHitUsed = false;
     // The Dread Moth alone has phases: it splits at two thirds of its
     // health and its shadow dims the towers at one third, quickening as
     // it is hurt.
@@ -56,9 +61,14 @@ export class Enemy {
     return now < this.markedUntil;
   }
 
-  // Current speed, chilled or not.
+  // Current speed, slowed or not. The slowest active slow wins: a
+  // lantern's chill is stronger than the blaze, so it takes precedence
+  // while both are on, and the two never multiply each other.
   currentSpeed(now) {
-    return now < this.slowUntil ? this.speed * this.slowFactor : this.speed;
+    let factor = 1;
+    if (now < this.slowUntil) factor = Math.min(factor, this.slowFactor);
+    if (now < this.flareUntil) factor = Math.min(factor, BEACON.slowFactor);
+    return this.speed * factor;
   }
 
   chill(factor, seconds, now) {
@@ -102,6 +112,16 @@ export class Enemy {
         move = 0;
       }
     }
+  }
+
+  // Which board cell the creature is standing in right now (the
+  // Beacon's blaze and the screenshots read this, not raw pixels).
+  get col() {
+    return Math.floor(this.x / BOARD.cell);
+  }
+
+  get row() {
+    return Math.floor(this.y / BOARD.cell);
   }
 
   // Fraction of health left, for the little bar above the creature.

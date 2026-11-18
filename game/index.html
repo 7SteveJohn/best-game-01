@@ -36,10 +36,14 @@
         <p class="story">
           Night has swallowed the shore. You are the Keeper — raise your
           towers along the path, choose the ember's blessings between
-          waves, and hold the last light through all twelve nights.
+          waves, and hold the last light through all twelve nights. The
+          sea brings a different tide each wave, and the lighthouse
+          itself can burn — once a wave, aim its flare at the thickest
+          of the dark and watch the ground catch fire.
         </p>
         <div class="how">
           <span><b>1 / 2 / 3 / 4</b> pick a tower</span>
+          <span><b>5</b> arm the Beacon Flare, <b>click</b> to fire it</span>
           <span><b>Click</b> a plot to build it</span>
           <span><b>Click</b> a tower to upgrade or sell</span>
           <span><b>Space</b> start the next wave</span>
@@ -73,7 +77,11 @@
       </div>
       <h2>Next wave</h2>
       <p id="next-wave" class="hint strong">Next: Wave 1 — 12 Wisps</p>
+      <p id="tide" class="tide"></p>
       <p id="advice" class="advice"></p>
+      <h2>Beacon Flare</h2>
+      <button id="btn-beacon" class="beacon-btn" disabled>Beacon Flare · 2 ember (5)</button>
+      <p id="beacon-note" class="hint">Once per wave, the lighthouse itself burns a 3×3 patch of ground for 4s: 30 damage a second, 35% slow. It costs ember to save ember.</p>
       <h2>Ember blessings</h2>
       <ul id="blessings" class="notes">
         <li class="hint">None yet — clear a wave and the ember offers one.</li>
@@ -84,6 +92,8 @@
         <li>Frost Lanterns slow the march — put them where the path bends.</li>
         <li>Storm Spires hit hard and their bolts leap. Save them for brutes.</li>
         <li>A Tide Bell marks foes — the next hit on a marked creature lands +15.</li>
+        <li>The sea brings a different tide each wave: Still Air makes first hits land +50%, Ashfall shortens every tower's reach 8%, Blackout slows the towers in columns 6–10. The forecast is above.</li>
+        <li>The Beacon Flare burns a 3×3 patch for 4s — 30 damage a second, 35% slow — once per wave, for 2 ember. It needs 3 ember left to fire. Aim it where the path is thickest.</li>
         <li>After each wave, the ember offers a blessing. Choose one; it lasts the run, up to twice each.</li>
         <li>The Dread Moth splits at two thirds of its health, and its shadow dims the towers at one third.</li>
         <li>Clearing a wave pays a bonus. Spend it before the next horn.</li>
@@ -92,7 +102,7 @@
   </main>
 
   <footer id="keys">
-    Mouse builds and aims · 1/2/3/4 towers · Space next wave · P pause · F speed · M sound · R restart on the end screen
+    Mouse builds and aims · 1/2/3/4 towers · 5 Beacon Flare · Space next wave · P pause · F speed · M sound · R restart on the end screen
   </footer>
 </div>
 <script type="module" src="./src/main.js"></script>
