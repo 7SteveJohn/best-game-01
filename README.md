@@ -1,10 +1,6 @@
 # Emberlight — Net the Night
 
-[![make.fun · best-game-01](https://make.fun/badge/best-game-01.svg)](https://make.fun/bounty/best-game-01)
-[![rank](https://make.fun/badge/best-game-01/7SteveJohn/best-game-01/rank.svg)](https://make.fun/bounty/best-game-01)
-[![reward](https://make.fun/badge/best-game-01/7SteveJohn/best-game-01/reward.svg)](https://make.fun/bounty/best-game-01)
-
-A game for the [make.fun best-game-01](https://make.fun/bounty/best-game-01) bounty. Hold the light through eight watches on a night sea. The lighthouse beam hurts nothing anymore — it catches. You are the Keeper: sweep the light across the dark, gather the creatures that crawl toward the ember, and carry them to the furnaces before they struggle free.
+Hold the light through eight watches on a night sea. The lighthouse beam hurts nothing anymore — it catches. You are the Keeper: sweep the light across the dark, gather the creatures that crawl toward the ember, and carry them to the furnaces before they struggle free.
 
 ## How to play
 
